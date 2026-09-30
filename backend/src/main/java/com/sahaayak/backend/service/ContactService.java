@@ -20,7 +20,7 @@ contact.setEmergency(request.isEmergency());
 return repository.save(contact);
 }
 public List<Contact> getContactsByUserId(Long userId) {
-return repository.findByUserId(userId);
+return repository.findByUserId(userId);}
 public Contact getContactById(Long id) {
 return repository.findById(id);
 public boolean deleteContact(Long id) {
