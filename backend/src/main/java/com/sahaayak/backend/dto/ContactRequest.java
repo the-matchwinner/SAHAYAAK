@@ -1,24 +1,11 @@
-package com.sahaayak.backend.model;
-public class Contact {
-private Long id;
+package com.sahaayak.backend.dto;
+public class ContactRequest {
 private Long userId;
 private String name;
 private String relationship;
 private String phone;
 private boolean emergency;
-public Contact() {}
-public Contact(Long id, Long userId, String name,
-String relationship, String phone,
-boolean emergency) {
-this.id = id;
-this.userId = userId;
-this.name = name;
-this.relationship = relationship;
-this.phone = phone;
-this.emergency = emergency;
-}
-public Long getId() { return id; }
-public void setId(Long id) { this.id = id; }
+public ContactRequest() {}
 public Long getUserId() { return userId; }
 public void setUserId(Long userId) { this.userId = userId; }
 public String getName() { return name; }
@@ -30,7 +17,5 @@ this.relationship = relationship;
 public String getPhone() { return phone; }
 public void setPhone(String phone) { this.phone = phone; }
 public boolean isEmergency() { return emergency; }
-public void setEmergency(boolean emergency) {
-this.emergency = emergency;
-}
-}
+
+public void setEmergency(boolean emergency) { this.emergency = emergency; }}
