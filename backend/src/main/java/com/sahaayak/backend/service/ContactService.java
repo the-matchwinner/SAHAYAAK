@@ -18,6 +18,7 @@ contact.setRelationship(request.getRelationship());
 contact.setPhone(request.getPhone());
 contact.setEmergency(request.isEmergency());
 return repository.save(contact);
+}
 public List<Contact> getContactsByUserId(Long userId) {
 return repository.findByUserId(userId);
 public Contact getContactById(Long id) {

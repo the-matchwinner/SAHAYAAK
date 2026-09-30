@@ -18,4 +18,4 @@ public String getPhone() { return phone; }
 public void setPhone(String phone) { this.phone = phone; }
 public boolean isEmergency() { return emergency; }
 
-public void setEmergency(boolean emergency) { this.emergency = emergency; }
+public void setEmergency(boolean emergency) { this.emergency = emergency; }}
