@@ -1,14 +1,59 @@
 import React, { useEffect, useState } from 'react';
 
+const API_BASE_URL = 'http://localhost:8080';
+const USER_ID = 1;
+
 export default function DashboardScreen({ userName, onNavigate }) {
   const displayName = userName ? userName.trim() : 'Dadaji';
 
   // State for reminders checklist
-  const [reminders, setReminders] = useState([
-    { id: 1, title: 'Morning Blood Pressure Tablet', time: '09:30 AM', note: '1 tablet with warm water', subtitle: 'After breakfast', icon: 'medication', taken: false },
-    { id: 2, title: 'Water Balcony Plants & Sun Walk', time: '12:00 PM', note: 'Gentle 15-minute garden walk', subtitle: 'Balcony garden', icon: 'potted_plant', taken: false },
-    { id: 3, title: 'Doctor Follow-up Call', time: '04:30 PM', note: 'Weekly tele-consultation', subtitle: 'Tele-Consult', icon: 'stethoscope', taken: false },
-  ]);
+ const [reminders, setReminders] = useState([]);
+const [loadingReminders, setLoadingReminders] = useState(true);
+
+
+const formatReminderTime = (time) => {
+  if (!time) return '';
+
+  const [hours, minutes] = time.split(':');
+  const hour = Number(hours);
+  const displayHour = hour % 12 || 12;
+  const period = hour >= 12 ? 'PM' : 'AM';
+
+  return `${displayHour}:${minutes} ${period}`;
+};
+
+const mapReminder = (item) => ({
+  id: item.id,
+  title: item.medicineName,
+  time: formatReminderTime(item.reminderTime),
+  note: item.dosage,
+  subtitle: item.frequency,
+  icon: 'medication',
+  taken: item.status === 'INACTIVE',
+});
+  useEffect(() => {
+  const loadReminders = async () => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/reminders/user/${USER_ID}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      setReminders(data.map(mapReminder));
+    } catch (error) {
+      console.error('Failed to load reminders:', error);
+    } finally {
+      setLoadingReminders(false);
+    }
+  };
+
+  loadReminders();
+}, []);
 
   // State for voice note audio simulation
   const [voicePlaying, setVoicePlaying] = useState(false);
@@ -17,11 +62,42 @@ export default function DashboardScreen({ userName, onNavigate }) {
 
   const memoryPhotoUrl = "https://lh3.googleusercontent.com/aida/AEtjO1Xml2rYMlSnOrELQis8hvmelm7otQsUOPimJ8szKoCGGu4P12tbrYMQwQN8qI1-pXTcHBw-JRJQPNHsN86Y1ALbpx5jUfd-Asy7VBMy83-Ic5bAY_G7Xf24P4AhKyvbnBFxf-8xeklgfYZhDeoizwINjf1qquprIpQ8vTU4zWiUF-1HSdTEK6dRG566VvKheRvYZInD3avPYPcIXbSNYSYItFpBj6a8a9YFZ3w1Jj11D_n-g8tYsnnXmxc";
 
-  const toggleReminder = (id) => {
-    setReminders((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, taken: !item.taken } : item))
+const toggleReminder = async (id) => {
+  const reminder = reminders.find((item) => item.id === id);
+
+  if (!reminder) return;
+
+  const newStatus = reminder.taken ? 'ACTIVE' : 'INACTIVE';
+
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/reminders/${id}/status`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: newStatus,
+        }),
+      }
     );
-  };
+
+    if (!response.ok) {
+      throw new Error(`HTTP error: ${response.status}`);
+    }
+
+    setReminders((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? { ...item, taken: !item.taken }
+          : item
+      )
+    );
+  } catch (error) {
+    console.error('Failed to update reminder status:', error);
+  }
+};
 
   const speakText = (phrase) => {
     if ('speechSynthesis' in window) {
