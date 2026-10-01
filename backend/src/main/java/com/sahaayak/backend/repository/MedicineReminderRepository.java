@@ -1,13 +1,13 @@
 package com.sahaayak.backend.repository;
 
-import com.sahaayak.backend.model.MedicineReminder;
+import java.sql.Time;
+import java.util.List;
+
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
-import java.sql.Time;
-import java.time.LocalTime;
-import java.util.List;
+import com.sahaayak.backend.model.MedicineReminder;
 
 @Repository
 public class MedicineReminderRepository {
@@ -81,6 +81,23 @@ public class MedicineReminderRepository {
         List<MedicineReminder> results = jdbcTemplate.query(sql, rowMapper, id);
 
         return results.isEmpty() ? null : results.get(0);
+    }
+
+    public boolean update(MedicineReminder reminder) {
+        String sql = """
+                UPDATE medicine_reminders
+                SET medicine_name = ?, dosage = ?, reminder_time = ?, frequency = ?
+                WHERE id = ? AND user_id = ?
+                """;
+
+        return jdbcTemplate.update(
+                sql,
+                reminder.getMedicineName(),
+                reminder.getDosage(),
+                reminder.getReminderTime(),
+                reminder.getFrequency(),
+                reminder.getId(),
+                reminder.getUserId()) > 0;
     }
 
     public boolean updateStatus(Long id, String status) {

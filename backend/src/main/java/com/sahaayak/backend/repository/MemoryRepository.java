@@ -1,11 +1,12 @@
 package com.sahaayak.backend.repository;
 
-import com.sahaayak.backend.model.Memory;
+import java.util.List;
+
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
+import com.sahaayak.backend.model.Memory;
 
 @Repository
 public class MemoryRepository {
@@ -75,6 +76,23 @@ public class MemoryRepository {
 
         return results.isEmpty() ? null : results.get(0);
     }
+
+        public boolean update(Memory memory) {
+                String sql = """
+                                UPDATE memories
+                                SET title = ?, description = ?, memory_date = ?, image_url = ?
+                                WHERE id = ? AND user_id = ?
+                                """;
+
+                return jdbcTemplate.update(
+                                sql,
+                                memory.getTitle(),
+                                memory.getDescription(),
+                                memory.getMemoryDate(),
+                                memory.getImageUrl(),
+                                memory.getId(),
+                                memory.getUserId()) > 0;
+        }
 
     public boolean delete(Long id) {
 

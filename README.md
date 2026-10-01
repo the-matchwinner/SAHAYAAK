@@ -3,7 +3,11 @@ Sahaayak is a user-friendly digital assistance portal designed to help elderly u
 
 ## Run with PostgreSQL
 
-The frontend reads reminders, contacts, and memories through the Spring Boot API. Reminder creation and completion updates are also saved through the API. The frontend uses the Vite `/api` proxy while developing locally.
+The frontend uses the Spring Boot API (proxied by Vite at `/api` during local development) for PostgreSQL-backed dashboard data:
+
+- **Reminders:** list, add, edit, delete, and enable/disable a reminder. The current schema stores whether a reminder is active; it does not track individual doses taken or send scheduled notifications.
+- **Contacts:** list, add, edit, delete, and call a saved contact.
+- **Memory Lane:** browse, add, edit, and delete memories. Images are referenced by URL; image file uploads are not implemented.
 
 1. Create a PostgreSQL database named `sahaayak`.
 2. From the repository root, apply `database_postgres/schema.sql`, then apply `database_postgres/sample_data.sql` once. The sample records belong to user ID `1`.
@@ -25,4 +29,4 @@ The frontend reads reminders, contacts, and memories through the Spring Boot API
 	npm run dev
 	```
 
-The dashboard currently loads records for user ID `1`, matching the included sample data. To point the frontend at a separately hosted API, set `VITE_API_BASE_URL` to its API base URL (ending in `/api`) before starting Vite.
+The dashboard currently uses user ID `1`, matching the included sample data; user registration/login and dynamic user selection are not implemented. To point the frontend at a separately hosted API, set `VITE_API_BASE_URL` to its API base URL (ending in `/api`) before starting Vite.

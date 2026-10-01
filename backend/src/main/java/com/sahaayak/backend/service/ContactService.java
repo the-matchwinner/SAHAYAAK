@@ -1,9 +1,11 @@
 package com.sahaayak.backend.service;
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+
 import com.sahaayak.backend.dto.ContactRequest;
 import com.sahaayak.backend.model.Contact;
 import com.sahaayak.backend.repository.ContactRepository;
-import org.springframework.stereotype.Service;
-import java.util.List;
 @Service
 public class ContactService {
 private final ContactRepository repository;
@@ -23,6 +25,16 @@ public List<Contact> getContactsByUserId(Long userId) {
 return repository.findByUserId(userId);}
 public Contact getContactById(Long id) {
 return repository.findById(id);
+}
+public Contact updateContact(Long id, ContactRequest request) {
+Contact contact = new Contact();
+contact.setId(id);
+contact.setUserId(request.getUserId());
+contact.setName(request.getName());
+contact.setRelationship(request.getRelationship());
+contact.setPhone(request.getPhone());
+contact.setEmergency(request.isEmergency());
+return repository.update(contact) ? repository.findById(id) : null;
 }
 public boolean deleteContact(Long id) {
 return repository.delete(id);

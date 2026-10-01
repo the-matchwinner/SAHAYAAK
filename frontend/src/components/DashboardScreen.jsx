@@ -22,8 +22,18 @@ export default function DashboardScreen({ userName, onNavigate }) {
   const [loadingMemories, setLoadingMemories] = useState(true);
   const [memoriesError, setMemoriesError] = useState('');
   const [showReminderForm, setShowReminderForm] = useState(false);
+  const [editingReminder, setEditingReminder] = useState(null);
   const [savingReminder, setSavingReminder] = useState(false);
   const [reminderFormError, setReminderFormError] = useState('');
+  const [showContactForm, setShowContactForm] = useState(false);
+  const [editingContact, setEditingContact] = useState(null);
+  const [savingContact, setSavingContact] = useState(false);
+  const [contactFormError, setContactFormError] = useState('');
+  const [showMemoryForm, setShowMemoryForm] = useState(false);
+  const [editingMemory, setEditingMemory] = useState(null);
+  const [savingMemory, setSavingMemory] = useState(false);
+  const [memoryFormError, setMemoryFormError] = useState('');
+  const [activeMemoryId, setActiveMemoryId] = useState(null);
 
   const formatReminderTime = (time) => {
     if (!time) return '';
@@ -35,40 +45,53 @@ export default function DashboardScreen({ userName, onNavigate }) {
   const mapReminder = (item) => ({
     id: item.id,
     title: item.medicineName,
+    rawTime: item.reminderTime?.slice(0, 5) || '',
     time: formatReminderTime(item.reminderTime),
     note: item.dosage,
     subtitle: item.frequency,
     icon: 'medication',
-    taken: item.status === 'INACTIVE',
+    active: item.status === 'ACTIVE',
   });
+
+  const refreshDashboardData = async (isCurrent = () => true) => {
+    setLoadingReminders(true);
+    setLoadingContacts(true);
+    setLoadingMemories(true);
+    setRemindersError('');
+    setContactsError('');
+    setMemoriesError('');
+
+    const results = await Promise.allSettled([
+      fetchApi(`/reminders/user/${USER_ID}`),
+      fetchApi(`/contacts/user/${USER_ID}`),
+      fetchApi(`/memories/user/${USER_ID}`),
+    ]);
+
+    if (isCurrent()) {
+      if (results[0].status === 'fulfilled') setReminders(results[0].value.map(mapReminder));
+      else {
+        console.error('Failed to load reminders:', results[0].reason);
+        setRemindersError('Could not load reminders. Check the backend connection, then retry.');
+      }
+      if (results[1].status === 'fulfilled') setContacts(results[1].value);
+      else {
+        console.error('Failed to load contacts:', results[1].reason);
+        setContactsError('Could not load contacts. Check the backend connection, then retry.');
+      }
+      if (results[2].status === 'fulfilled') setMemories(results[2].value);
+      else {
+        console.error('Failed to load memories:', results[2].reason);
+        setMemoriesError('Could not load memories. Check the backend connection, then retry.');
+      }
+      setLoadingReminders(false);
+      setLoadingContacts(false);
+      setLoadingMemories(false);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
-
-    fetchApi(`/reminders/user/${USER_ID}`)
-      .then((data) => { if (isMounted) setReminders(data.map(mapReminder)); })
-      .catch((error) => {
-        console.error('Failed to load reminders:', error);
-        if (isMounted) setRemindersError('Could not load reminders. Check the backend connection.');
-      })
-      .finally(() => { if (isMounted) setLoadingReminders(false); });
-
-    fetchApi(`/contacts/user/${USER_ID}`)
-      .then((data) => { if (isMounted) setContacts(data); })
-      .catch((error) => {
-        console.error('Failed to load contacts:', error);
-        if (isMounted) setContactsError('Could not load contacts. Check the backend connection.');
-      })
-      .finally(() => { if (isMounted) setLoadingContacts(false); });
-
-    fetchApi(`/memories/user/${USER_ID}`)
-      .then((data) => { if (isMounted) setMemories(data); })
-      .catch((error) => {
-        console.error('Failed to load memories:', error);
-        if (isMounted) setMemoriesError('Could not load memories. Check the backend connection.');
-      })
-      .finally(() => { if (isMounted) setLoadingMemories(false); });
-
+    refreshDashboardData(() => isMounted);
     return () => { isMounted = false; };
   }, []);
 
@@ -80,13 +103,15 @@ export default function DashboardScreen({ userName, onNavigate }) {
   const memoryPhotoUrl = "https://lh3.googleusercontent.com/aida/AEtjO1Xml2rYMlSnOrELQis8hvmelm7otQsUOPimJ8szKoCGGu4P12tbrYMQwQN8qI1-pXTcHBw-JRJQPNHsN86Y1ALbpx5jUfd-Asy7VBMy83-Ic5bAY_G7Xf24P4AhKyvbnBFxf-8xeklgfYZhDeoizwINjf1qquprIpQ8vTU4zWiUF-1HSdTEK6dRG566VvKheRvYZInD3avPYPcIXbSNYSYItFpBj6a8a9YFZ3w1Jj11D_n-g8tYsnnXmxc";
   const featuredMemory = memories[0];
   const featuredPhotoUrl = featuredMemory?.imageUrl || memoryPhotoUrl;
+  const selectedMemory = memories.find((memory) => memory.id === activeMemoryId) || featuredMemory;
+  const selectedMemoryPhotoUrl = selectedMemory?.imageUrl || memoryPhotoUrl;
 
 const toggleReminder = async (id) => {
   const reminder = reminders.find((item) => item.id === id);
 
   if (!reminder) return;
 
-  const newStatus = reminder.taken ? 'ACTIVE' : 'INACTIVE';
+  const newStatus = reminder.active ? 'INACTIVE' : 'ACTIVE';
 
   try {
     await fetchApi(`/reminders/${id}/status`, {
@@ -102,7 +127,7 @@ const toggleReminder = async (id) => {
     setReminders((prev) =>
       prev.map((item) =>
         item.id === id
-          ? { ...item, taken: !item.taken }
+          ? { ...item, active: !item.active }
           : item
       )
     );
@@ -112,7 +137,7 @@ const toggleReminder = async (id) => {
   }
 };
 
-const createReminder = async (event) => {
+const saveReminder = async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
   const formData = new FormData(form);
@@ -120,8 +145,10 @@ const createReminder = async (event) => {
   setReminderFormError('');
 
   try {
-    const savedReminder = await fetchApi('/reminders', {
-      method: 'POST',
+    const savedReminder = await fetchApi(
+      editingReminder ? `/reminders/${editingReminder.id}` : '/reminders',
+      {
+      method: editingReminder ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         userId: USER_ID,
@@ -130,15 +157,131 @@ const createReminder = async (event) => {
         reminderTime: formData.get('reminderTime'),
         frequency: formData.get('frequency'),
       }),
-    });
-    setReminders((current) => [...current, mapReminder(savedReminder)]);
+      }
+    );
+    setReminders((current) => editingReminder
+      ? current.map((item) => item.id === savedReminder.id ? mapReminder(savedReminder) : item)
+      : [...current, mapReminder(savedReminder)]);
     form.reset();
     setShowReminderForm(false);
+    setEditingReminder(null);
   } catch (error) {
     console.error('Failed to create reminder:', error);
     setReminderFormError('Could not save the reminder. Check the backend connection and try again.');
   } finally {
     setSavingReminder(false);
+  }
+};
+
+const deleteReminder = async (reminder) => {
+  if (!window.confirm(`Delete the reminder for ${reminder.title}?`)) return;
+  try {
+    await fetchApi(`/reminders/${reminder.id}`, { method: 'DELETE' });
+    setReminders((current) => current.filter((item) => item.id !== reminder.id));
+  } catch (error) {
+    console.error('Failed to delete reminder:', error);
+    setRemindersError('Could not delete this reminder. Please try again.');
+  }
+};
+
+const saveContact = async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const formData = new FormData(form);
+  setSavingContact(true);
+  setContactFormError('');
+  const request = {
+    userId: USER_ID,
+    name: formData.get('name').trim(),
+    relationship: formData.get('relationship').trim(),
+    phone: formData.get('phone').trim(),
+    emergency: formData.get('emergency') === 'on',
+  };
+
+  try {
+    const saved = await fetchApi(
+      editingContact ? `/contacts/${editingContact.id}` : '/contacts',
+      {
+        method: editingContact ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      }
+    );
+    setContacts((current) => editingContact
+      ? current.map((contact) => contact.id === saved.id ? saved : contact)
+      : [...current, saved]);
+    form.reset();
+    setShowContactForm(false);
+    setEditingContact(null);
+  } catch (error) {
+    console.error('Failed to save contact:', error);
+    setContactFormError('Could not save the contact. Check the backend connection and try again.');
+  } finally {
+    setSavingContact(false);
+  }
+};
+
+const deleteContact = async (contact) => {
+  if (!window.confirm(`Delete ${contact.name} from contacts?`)) return;
+  try {
+    await fetchApi(`/contacts/${contact.id}`, { method: 'DELETE' });
+    setContacts((current) => current.filter((item) => item.id !== contact.id));
+  } catch (error) {
+    console.error('Failed to delete contact:', error);
+    setContactsError('Could not delete this contact. Please try again.');
+  }
+};
+
+const saveMemory = async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const formData = new FormData(form);
+  setSavingMemory(true);
+  setMemoryFormError('');
+  const request = {
+    userId: USER_ID,
+    title: formData.get('title').trim(),
+    description: formData.get('description').trim(),
+    memoryDate: formData.get('memoryDate') || null,
+    imageUrl: formData.get('imageUrl').trim() || null,
+  };
+
+  try {
+    const saved = await fetchApi(
+      editingMemory ? `/memories/${editingMemory.id}` : '/memories',
+      {
+        method: editingMemory ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      }
+    );
+    setMemories((current) => editingMemory
+      ? current.map((memory) => memory.id === saved.id ? saved : memory)
+      : [saved, ...current]);
+    setActiveMemoryId(saved.id);
+    form.reset();
+    setShowMemoryForm(false);
+    setEditingMemory(null);
+  } catch (error) {
+    console.error('Failed to save memory:', error);
+    setMemoryFormError('Could not save the memory. Check the backend connection and try again.');
+  } finally {
+    setSavingMemory(false);
+  }
+};
+
+const deleteMemory = async (memory) => {
+  if (!window.confirm(`Delete “${memory.title}” from your memories?`)) return;
+  try {
+    await fetchApi(`/memories/${memory.id}`, { method: 'DELETE' });
+    setMemories((current) => {
+      const remaining = current.filter((item) => item.id !== memory.id);
+      setActiveMemoryId(remaining[0]?.id ?? null);
+      return remaining;
+    });
+  } catch (error) {
+    console.error('Failed to delete memory:', error);
+    setMemoriesError('Could not delete this memory. Please try again.');
   }
 };
 
@@ -277,13 +420,21 @@ const createReminder = async (event) => {
                   <span className="material-symbols-outlined text-[28px]">schedule</span>
                 </div>
                 <div>
-                  <h2 className="font-bold text-2xl text-[#003531]">Today’s Schedule &amp; Medicine</h2>
-                  <span className="text-base text-[#404947]">{reminders.filter(r => !r.taken).length} important items remaining</span>
+                  <h2 className="font-bold text-2xl text-[#003531]">Medicine Reminders</h2>
+                  <span className="text-base text-[#404947]">{reminders.filter((reminder) => reminder.active).length} active reminders</span>
                 </div>
               </div>
               <span className="hidden sm:inline-block px-3 py-1 rounded-full bg-[#fc934f]/20 text-[#994703] font-bold text-xs">
-                Today • Active
+                Recurring schedule
               </span>
+              <button
+                type="button"
+                onClick={() => refreshDashboardData()}
+                disabled={loadingReminders || loadingContacts || loadingMemories}
+                className="h-10 px-4 rounded-full bg-[#e6f0ee] text-[#003531] text-sm font-bold disabled:opacity-60"
+              >
+                {loadingReminders || loadingContacts || loadingMemories ? 'Refreshing…' : 'Refresh'}
+              </button>
             </div>
 
             <div className="flex flex-col gap-4">
@@ -296,7 +447,7 @@ const createReminder = async (event) => {
                 <div
                   key={rem.id}
                   className={`p-5 rounded-2xl border-2 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-                    rem.taken
+                    !rem.active
                       ? 'bg-[#f2fbf9] border-[#dbe5e2] opacity-75'
                       : rem.id === 1
                       ? 'bg-[#ecf6f4] border-[#fc934f] shadow-sm'
@@ -306,40 +457,44 @@ const createReminder = async (event) => {
                   <div className="flex items-start gap-4">
                     <div
                       className={`h-14 w-14 rounded-full flex items-center justify-center shrink-0 shadow-md ${
-                        rem.taken ? 'bg-gray-200 text-gray-500' : 'bg-[#994703] text-white'
+                        !rem.active ? 'bg-gray-200 text-gray-500' : 'bg-[#994703] text-white'
                       }`}
                     >
                       <span className="material-symbols-outlined text-[30px]">{rem.icon}</span>
                     </div>
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <span className={`font-bold text-lg ${rem.taken ? 'text-gray-500' : 'text-[#994703]'}`}>
+                        <span className={`font-bold text-lg ${!rem.active ? 'text-gray-500' : 'text-[#994703]'}`}>
                           {rem.time}
                         </span>
                         <span className="text-gray-300">•</span>
                         <span className="text-sm font-semibold text-[#404947]">{rem.subtitle}</span>
                       </div>
-                      <h3 className={`font-bold text-xl ${rem.taken ? 'line-through text-gray-500' : 'text-[#003531]'}`}>
+                      <h3 className={`font-bold text-xl ${!rem.active ? 'text-gray-500' : 'text-[#003531]'}`}>
                         {rem.title}
                       </h3>
                       <p className="text-base text-[#404947]">{rem.note}</p>
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => toggleReminder(rem.id)}
-                    className={`h-14 px-5 rounded-full font-bold text-base flex items-center justify-center gap-2 transition-all shrink-0 cursor-pointer shadow-sm ${
-                      rem.taken
-                        ? 'bg-[#e6f0ee] text-[#707977]'
-                        : 'bg-[#003531] text-white hover:bg-[#0e4d48] active:scale-95'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[24px]">
-                      {rem.taken ? 'check_box' : 'check_box_outline_blank'}
-                    </span>
-                    <span>{rem.taken ? 'Completed' : 'Mark as Taken'}</span>
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleReminder(rem.id)}
+                      className={`h-12 px-4 rounded-full font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm ${
+                        !rem.active
+                          ? 'bg-[#e6f0ee] text-[#707977]'
+                          : 'bg-[#003531] text-white hover:bg-[#0e4d48] active:scale-95'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[20px]">
+                        {rem.active ? 'toggle_on' : 'toggle_off'}
+                      </span>
+                      <span>{rem.active ? 'Disable' : 'Enable'}</span>
+                    </button>
+                    <button type="button" onClick={() => { setEditingReminder(rem); setReminderFormError(''); setShowReminderForm(true); }} className="h-12 px-4 rounded-full bg-[#e6f0ee] text-[#003531] font-semibold text-sm">Edit</button>
+                    <button type="button" onClick={() => deleteReminder(rem)} className="h-12 px-4 rounded-full bg-red-50 text-red-800 font-semibold text-sm">Delete</button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -348,31 +503,38 @@ const createReminder = async (event) => {
               type="button"
               onClick={() => {
                 setReminderFormError('');
-                setShowReminderForm((visible) => !visible);
+                if (showReminderForm) {
+                  setShowReminderForm(false);
+                  setEditingReminder(null);
+                } else {
+                  setEditingReminder(null);
+                  setShowReminderForm(true);
+                }
               }}
               className="mt-6 w-full h-16 rounded-full bg-[#ecf6f4] hover:bg-[#e6f0ee] text-[#003531] font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-sm active:scale-95 cursor-pointer border border-[#bfc8c6]/40"
             >
               <span className="material-symbols-outlined text-[28px] text-[#994703]">add_circle</span>
-              <span>{showReminderForm ? 'Cancel Adding Reminder' : 'Add a Medicine Reminder'}</span>
+              <span>{showReminderForm ? 'Cancel' : 'Add a Medicine Reminder'}</span>
             </button>
 
             {showReminderForm && (
-              <form onSubmit={createReminder} className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-2xl border border-[#dbe5e2] bg-[#f2fbf9] p-5">
+              <form key={editingReminder?.id || 'new-reminder'} onSubmit={saveReminder} className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-2xl border border-[#dbe5e2] bg-[#f2fbf9] p-5">
+                <h3 className="sm:col-span-2 text-lg font-bold text-[#003531]">{editingReminder ? 'Edit medicine reminder' : 'Add medicine reminder'}</h3>
                 <label className="flex flex-col gap-1 text-sm font-semibold text-[#003531]">
                   Medicine name
-                  <input name="medicineName" required maxLength="100" className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base" />
+                  <input name="medicineName" required maxLength="100" defaultValue={editingReminder?.title || ''} className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base" />
                 </label>
                 <label className="flex flex-col gap-1 text-sm font-semibold text-[#003531]">
                   Dosage
-                  <input name="dosage" required maxLength="100" placeholder="e.g. 1 tablet" className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base" />
+                  <input name="dosage" required maxLength="100" defaultValue={editingReminder?.note || ''} placeholder="e.g. 1 tablet" className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base" />
                 </label>
                 <label className="flex flex-col gap-1 text-sm font-semibold text-[#003531]">
                   Reminder time
-                  <input name="reminderTime" type="time" required className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base" />
+                  <input name="reminderTime" type="time" required defaultValue={editingReminder?.rawTime || ''} className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base" />
                 </label>
                 <label className="flex flex-col gap-1 text-sm font-semibold text-[#003531]">
                   Frequency
-                  <select name="frequency" defaultValue="DAILY" className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base">
+                  <select name="frequency" defaultValue={editingReminder?.subtitle || 'DAILY'} className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base">
                     <option value="DAILY">Daily</option>
                     <option value="WEEKLY">Weekly</option>
                     <option value="AS_NEEDED">As needed</option>
@@ -380,7 +542,7 @@ const createReminder = async (event) => {
                 </label>
                 {reminderFormError && <p role="alert" className="sm:col-span-2 text-sm text-red-700">{reminderFormError}</p>}
                 <button type="submit" disabled={savingReminder} className="sm:col-span-2 h-12 rounded-full bg-[#003531] text-white font-bold disabled:opacity-60">
-                  {savingReminder ? 'Saving…' : 'Save Reminder'}
+                  {savingReminder ? 'Saving…' : editingReminder ? 'Save Changes' : 'Save Reminder'}
                 </button>
               </form>
             )}
@@ -398,6 +560,22 @@ const createReminder = async (event) => {
                   <span className="text-base text-[#404947]">Single tap for instant connect</span>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (showContactForm) {
+                    setShowContactForm(false);
+                    setEditingContact(null);
+                  } else {
+                    setEditingContact(null);
+                    setContactFormError('');
+                    setShowContactForm(true);
+                  }
+                }}
+                className="h-12 px-5 rounded-full bg-[#003531] text-white font-bold text-sm"
+              >
+                {showContactForm ? 'Cancel' : 'Add Contact'}
+              </button>
             </div>
 
             <div className="flex flex-col gap-4">
@@ -427,9 +605,37 @@ const createReminder = async (event) => {
                     <span className="material-symbols-outlined text-[24px]">call</span>
                     <span>Call {contact.phone}</span>
                   </a>
+                  <button type="button" onClick={() => { setEditingContact(contact); setContactFormError(''); setShowContactForm(true); }} className="h-12 px-4 rounded-full bg-white text-[#003531] font-semibold text-sm">Edit</button>
+                  <button type="button" onClick={() => deleteContact(contact)} className="h-12 px-4 rounded-full bg-red-50 text-red-800 font-semibold text-sm">Delete</button>
                 </div>
               ))}
             </div>
+
+            {showContactForm && (
+              <form key={editingContact?.id || 'new-contact'} onSubmit={saveContact} className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-2xl border border-[#dbe5e2] bg-[#f2fbf9] p-5">
+                <h3 className="sm:col-span-2 text-lg font-bold text-[#003531]">{editingContact ? 'Edit contact' : 'Add a contact'}</h3>
+                <label className="flex flex-col gap-1 text-sm font-semibold text-[#003531]">
+                  Name
+                  <input name="name" required maxLength="100" defaultValue={editingContact?.name || ''} className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base" />
+                </label>
+                <label className="flex flex-col gap-1 text-sm font-semibold text-[#003531]">
+                  Relationship
+                  <input name="relationship" required maxLength="50" defaultValue={editingContact?.relationship || ''} placeholder="e.g. Daughter, Doctor" className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base" />
+                </label>
+                <label className="flex flex-col gap-1 text-sm font-semibold text-[#003531]">
+                  Phone number
+                  <input name="phone" type="tel" required maxLength="15" defaultValue={editingContact?.phone || ''} className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base" />
+                </label>
+                <label className="flex items-center gap-3 text-sm font-semibold text-[#003531]">
+                  <input name="emergency" type="checkbox" defaultChecked={editingContact?.emergency || false} className="h-5 w-5 accent-[#003531]" />
+                  Emergency contact
+                </label>
+                {contactFormError && <p role="alert" className="sm:col-span-2 text-sm text-red-700">{contactFormError}</p>}
+                <button type="submit" disabled={savingContact} className="sm:col-span-2 h-12 rounded-full bg-[#003531] text-white font-bold disabled:opacity-60">
+                  {savingContact ? 'Saving…' : editingContact ? 'Save Changes' : 'Save Contact'}
+                </button>
+              </form>
+            )}
           </section>
 
           {/* Easy App Launches */}
@@ -496,7 +702,7 @@ const createReminder = async (event) => {
           <section className="bg-white rounded-2xl overflow-hidden shadow-md border border-[#dbe5e2]">
             <div
               className="relative w-full aspect-[4/3] overflow-hidden bg-[#e6f0ee] group cursor-pointer"
-              onClick={() => setShowPhotoModal(true)}
+              onClick={() => { setActiveMemoryId(featuredMemory?.id ?? null); setShowPhotoModal(true); }}
             >
               <img
                 src={featuredPhotoUrl}
@@ -523,7 +729,7 @@ const createReminder = async (event) => {
 
             <div className="p-6 flex flex-col gap-4">
               <p className="text-base text-[#404947] leading-relaxed">
-                {memoriesError || featuredMemory?.description || 'Your saved family memories will appear here.'}
+                {memoriesError || featuredMemory?.description || (loadingMemories ? 'Loading memories…' : 'No saved memories yet. Add a memory to start your family album.')}
               </p>
               {memoriesError && <p role="alert" className="text-sm text-red-700">{memoriesError}</p>}
               <div className="flex flex-col gap-3">
@@ -544,7 +750,7 @@ const createReminder = async (event) => {
 
                 <button
                   type="button"
-                  onClick={() => setShowPhotoModal(true)}
+                  onClick={() => { setActiveMemoryId(featuredMemory?.id ?? null); setShowPhotoModal(true); }}
                   className="w-full h-14 rounded-full bg-[#e6f0ee] hover:bg-[#dbe5e2] active:scale-95 text-[#003531] font-semibold text-base flex items-center justify-center gap-2 transition-all cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[24px]">photo_library</span>
@@ -552,6 +758,42 @@ const createReminder = async (event) => {
                   <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
                 </button>
               </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => { setEditingMemory(null); setMemoryFormError(''); setShowMemoryForm((visible) => !visible); }} className="h-11 px-4 rounded-full bg-[#003531] text-white font-semibold text-sm">
+                  {showMemoryForm && !editingMemory ? 'Cancel' : 'Add Memory'}
+                </button>
+                {featuredMemory && (
+                  <>
+                    <button type="button" onClick={() => { setEditingMemory(featuredMemory); setMemoryFormError(''); setShowMemoryForm(true); }} className="h-11 px-4 rounded-full bg-[#e6f0ee] text-[#003531] font-semibold text-sm">Edit Featured</button>
+                    <button type="button" onClick={() => deleteMemory(featuredMemory)} className="h-11 px-4 rounded-full bg-red-50 text-red-800 font-semibold text-sm">Delete Featured</button>
+                  </>
+                )}
+              </div>
+              {showMemoryForm && (
+                <form key={editingMemory?.id || 'new-memory'} onSubmit={saveMemory} className="grid grid-cols-1 gap-4 rounded-2xl border border-[#dbe5e2] bg-[#f2fbf9] p-5">
+                  <h3 className="text-lg font-bold text-[#003531]">{editingMemory ? 'Edit memory' : 'Add a family memory'}</h3>
+                  <label className="flex flex-col gap-1 text-sm font-semibold text-[#003531]">
+                    Title
+                    <input name="title" required maxLength="200" defaultValue={editingMemory?.title || ''} className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base" />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm font-semibold text-[#003531]">
+                    Description
+                    <textarea name="description" rows="3" defaultValue={editingMemory?.description || ''} className="rounded-xl border border-[#bfc8c6] bg-white p-3 text-base" />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm font-semibold text-[#003531]">
+                    Date
+                    <input name="memoryDate" type="date" defaultValue={editingMemory?.memoryDate || ''} className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base" />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm font-semibold text-[#003531]">
+                    Photo URL
+                    <input name="imageUrl" type="url" maxLength="2000" placeholder="https://…" defaultValue={editingMemory?.imageUrl || ''} className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base" />
+                  </label>
+                  {memoryFormError && <p role="alert" className="text-sm text-red-700">{memoryFormError}</p>}
+                  <button type="submit" disabled={savingMemory} className="h-12 rounded-full bg-[#003531] text-white font-bold disabled:opacity-60">
+                    {savingMemory ? 'Saving…' : editingMemory ? 'Save Changes' : 'Save Memory'}
+                  </button>
+                </form>
+              )}
             </div>
           </section>
 
@@ -662,15 +904,37 @@ const createReminder = async (event) => {
               <span className="material-symbols-outlined text-[28px]">close</span>
             </button>
             <h3 className="font-bold text-2xl text-[#003531]">Family Photo Album</h3>
-            <img
-              src={featuredPhotoUrl}
-              onError={(event) => { event.currentTarget.src = memoryPhotoUrl; }}
-              alt="Expanded view of family memory"
-              className="w-full max-h-[60vh] object-contain rounded-2xl"
-            />
-            <p className="text-center text-[#404947] text-base font-medium">
-              {featuredMemory?.description || 'Your saved family memories will appear here.'}
-            </p>
+            {selectedMemory ? (
+              <>
+                <img
+                  src={selectedMemoryPhotoUrl}
+                  onError={(event) => { event.currentTarget.src = memoryPhotoUrl; }}
+                  alt={selectedMemory.title}
+                  className="w-full max-h-[50vh] object-contain rounded-2xl"
+                />
+                <div className="text-center">
+                  <h4 className="text-xl font-bold text-[#003531]">{selectedMemory.title}</h4>
+                  {selectedMemory.memoryDate && <p className="text-sm text-[#707977]">{selectedMemory.memoryDate}</p>}
+                  {selectedMemory.description && <p className="mt-2 text-[#404947]">{selectedMemory.description}</p>}
+                </div>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <button type="button" onClick={() => { setEditingMemory(selectedMemory); setMemoryFormError(''); setShowMemoryForm(true); setShowPhotoModal(false); }} className="h-11 px-4 rounded-full bg-[#e6f0ee] text-[#003531] font-semibold text-sm">Edit Memory</button>
+                  <button type="button" onClick={() => deleteMemory(selectedMemory)} className="h-11 px-4 rounded-full bg-red-50 text-red-800 font-semibold text-sm">Delete Memory</button>
+                </div>
+              </>
+            ) : (
+              <p className="text-center text-[#404947]">No saved memories yet. Add one from the Memory Lane card.</p>
+            )}
+            {memories.length > 0 && (
+              <div className="grid w-full grid-cols-2 sm:grid-cols-3 gap-3 max-h-48 overflow-y-auto">
+                {memories.map((memory) => (
+                  <button key={memory.id} type="button" onClick={() => setActiveMemoryId(memory.id)} aria-pressed={selectedMemory?.id === memory.id} className={`rounded-xl border-2 p-2 text-left ${selectedMemory?.id === memory.id ? 'border-[#003531] bg-[#ecf6f4]' : 'border-[#dbe5e2] bg-white'}`}>
+                    <img src={memory.imageUrl || memoryPhotoUrl} onError={(event) => { event.currentTarget.src = memoryPhotoUrl; }} alt="" className="h-20 w-full rounded-lg object-cover" />
+                    <span className="mt-1 block truncate text-sm font-semibold text-[#003531]">{memory.title}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <button
               type="button"
               onClick={() => setShowPhotoModal(false)}

@@ -1,9 +1,11 @@
 package com.sahaayak.backend.repository;
-import com.sahaayak.backend.model.Contact;
+import java.util.List;
+
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
-import java.util.List;
+
+import com.sahaayak.backend.model.Contact;
 @Repository
 public class ContactRepository {
 private final JdbcTemplate jdbcTemplate;
@@ -60,6 +62,21 @@ WHERE id = ?
 List<Contact> results =
 jdbcTemplate.query(sql, rowMapper, id);
 return results.isEmpty() ? null : results.get(0);
+}
+public boolean update(Contact contact) {
+String sql = """
+UPDATE contacts
+SET name = ?, relationship = ?, phone = ?, is_emergency = ?
+WHERE id = ? AND user_id = ?
+""";
+return jdbcTemplate.update(
+sql,
+contact.getName(),
+contact.getRelationship(),
+contact.getPhone(),
+contact.isEmergency(),
+contact.getId(),
+contact.getUserId()) > 0;
 }
 public boolean delete(Long id) {
 return jdbcTemplate.update(
