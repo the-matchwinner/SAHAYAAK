@@ -1,59 +1,76 @@
 import React, { useEffect, useState } from 'react';
 
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 const USER_ID = 1;
+
+async function fetchApi(path, options) {
+  const response = await fetch(`${API_BASE_URL}${path}`, options);
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  return response.status === 204 ? null : response.json();
+}
 
 export default function DashboardScreen({ userName, onNavigate }) {
   const displayName = userName ? userName.trim() : 'Dadaji';
 
-  // State for reminders checklist
- const [reminders, setReminders] = useState([]);
-const [loadingReminders, setLoadingReminders] = useState(true);
+  const [reminders, setReminders] = useState([]);
+  const [loadingReminders, setLoadingReminders] = useState(true);
+  const [remindersError, setRemindersError] = useState('');
+  const [contacts, setContacts] = useState([]);
+  const [loadingContacts, setLoadingContacts] = useState(true);
+  const [contactsError, setContactsError] = useState('');
+  const [memories, setMemories] = useState([]);
+  const [loadingMemories, setLoadingMemories] = useState(true);
+  const [memoriesError, setMemoriesError] = useState('');
+  const [showReminderForm, setShowReminderForm] = useState(false);
+  const [savingReminder, setSavingReminder] = useState(false);
+  const [reminderFormError, setReminderFormError] = useState('');
 
-
-const formatReminderTime = (time) => {
-  if (!time) return '';
-
-  const [hours, minutes] = time.split(':');
-  const hour = Number(hours);
-  const displayHour = hour % 12 || 12;
-  const period = hour >= 12 ? 'PM' : 'AM';
-
-  return `${displayHour}:${minutes} ${period}`;
-};
-
-const mapReminder = (item) => ({
-  id: item.id,
-  title: item.medicineName,
-  time: formatReminderTime(item.reminderTime),
-  note: item.dosage,
-  subtitle: item.frequency,
-  icon: 'medication',
-  taken: item.status === 'INACTIVE',
-});
-  useEffect(() => {
-  const loadReminders = async () => {
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/reminders/user/${USER_ID}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      setReminders(data.map(mapReminder));
-    } catch (error) {
-      console.error('Failed to load reminders:', error);
-    } finally {
-      setLoadingReminders(false);
-    }
+  const formatReminderTime = (time) => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':');
+    const hour = Number(hours);
+    return `${hour % 12 || 12}:${minutes} ${hour >= 12 ? 'PM' : 'AM'}`;
   };
 
-  loadReminders();
-}, []);
+  const mapReminder = (item) => ({
+    id: item.id,
+    title: item.medicineName,
+    time: formatReminderTime(item.reminderTime),
+    note: item.dosage,
+    subtitle: item.frequency,
+    icon: 'medication',
+    taken: item.status === 'INACTIVE',
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+
+    fetchApi(`/reminders/user/${USER_ID}`)
+      .then((data) => { if (isMounted) setReminders(data.map(mapReminder)); })
+      .catch((error) => {
+        console.error('Failed to load reminders:', error);
+        if (isMounted) setRemindersError('Could not load reminders. Check the backend connection.');
+      })
+      .finally(() => { if (isMounted) setLoadingReminders(false); });
+
+    fetchApi(`/contacts/user/${USER_ID}`)
+      .then((data) => { if (isMounted) setContacts(data); })
+      .catch((error) => {
+        console.error('Failed to load contacts:', error);
+        if (isMounted) setContactsError('Could not load contacts. Check the backend connection.');
+      })
+      .finally(() => { if (isMounted) setLoadingContacts(false); });
+
+    fetchApi(`/memories/user/${USER_ID}`)
+      .then((data) => { if (isMounted) setMemories(data); })
+      .catch((error) => {
+        console.error('Failed to load memories:', error);
+        if (isMounted) setMemoriesError('Could not load memories. Check the backend connection.');
+      })
+      .finally(() => { if (isMounted) setLoadingMemories(false); });
+
+    return () => { isMounted = false; };
+  }, []);
 
   // State for voice note audio simulation
   const [voicePlaying, setVoicePlaying] = useState(false);
@@ -61,6 +78,8 @@ const mapReminder = (item) => ({
   const [activeMusic, setActiveMusic] = useState(null);
 
   const memoryPhotoUrl = "https://lh3.googleusercontent.com/aida/AEtjO1Xml2rYMlSnOrELQis8hvmelm7otQsUOPimJ8szKoCGGu4P12tbrYMQwQN8qI1-pXTcHBw-JRJQPNHsN86Y1ALbpx5jUfd-Asy7VBMy83-Ic5bAY_G7Xf24P4AhKyvbnBFxf-8xeklgfYZhDeoizwINjf1qquprIpQ8vTU4zWiUF-1HSdTEK6dRG566VvKheRvYZInD3avPYPcIXbSNYSYItFpBj6a8a9YFZ3w1Jj11D_n-g8tYsnnXmxc";
+  const featuredMemory = memories[0];
+  const featuredPhotoUrl = featuredMemory?.imageUrl || memoryPhotoUrl;
 
 const toggleReminder = async (id) => {
   const reminder = reminders.find((item) => item.id === id);
@@ -70,9 +89,7 @@ const toggleReminder = async (id) => {
   const newStatus = reminder.taken ? 'ACTIVE' : 'INACTIVE';
 
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/api/reminders/${id}/status`,
-      {
+    await fetchApi(`/reminders/${id}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -80,12 +97,7 @@ const toggleReminder = async (id) => {
         body: JSON.stringify({
           status: newStatus,
         }),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`HTTP error: ${response.status}`);
-    }
+      });
 
     setReminders((prev) =>
       prev.map((item) =>
@@ -96,6 +108,37 @@ const toggleReminder = async (id) => {
     );
   } catch (error) {
     console.error('Failed to update reminder status:', error);
+    setRemindersError('Could not update this reminder. Please try again.');
+  }
+};
+
+const createReminder = async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const formData = new FormData(form);
+  setSavingReminder(true);
+  setReminderFormError('');
+
+  try {
+    const savedReminder = await fetchApi('/reminders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: USER_ID,
+        medicineName: formData.get('medicineName').trim(),
+        dosage: formData.get('dosage').trim(),
+        reminderTime: formData.get('reminderTime'),
+        frequency: formData.get('frequency'),
+      }),
+    });
+    setReminders((current) => [...current, mapReminder(savedReminder)]);
+    form.reset();
+    setShowReminderForm(false);
+  } catch (error) {
+    console.error('Failed to create reminder:', error);
+    setReminderFormError('Could not save the reminder. Check the backend connection and try again.');
+  } finally {
+    setSavingReminder(false);
   }
 };
 
@@ -244,6 +287,11 @@ const toggleReminder = async (id) => {
             </div>
 
             <div className="flex flex-col gap-4">
+              {loadingReminders && <p className="text-base text-[#404947]">Loading reminders…</p>}
+              {remindersError && <p role="alert" className="text-base text-red-700">{remindersError}</p>}
+              {!loadingReminders && !remindersError && reminders.length === 0 && (
+                <p className="text-base text-[#404947]">No medicine reminders have been saved yet.</p>
+              )}
               {reminders.map((rem) => (
                 <div
                   key={rem.id}
@@ -298,12 +346,44 @@ const toggleReminder = async (id) => {
 
             <button
               type="button"
-              onClick={promptVoiceReminder}
+              onClick={() => {
+                setReminderFormError('');
+                setShowReminderForm((visible) => !visible);
+              }}
               className="mt-6 w-full h-16 rounded-full bg-[#ecf6f4] hover:bg-[#e6f0ee] text-[#003531] font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-sm active:scale-95 cursor-pointer border border-[#bfc8c6]/40"
             >
               <span className="material-symbols-outlined text-[28px] text-[#994703]">add_circle</span>
-              <span>Add a Reminder with Voice</span>
+              <span>{showReminderForm ? 'Cancel Adding Reminder' : 'Add a Medicine Reminder'}</span>
             </button>
+
+            {showReminderForm && (
+              <form onSubmit={createReminder} className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-2xl border border-[#dbe5e2] bg-[#f2fbf9] p-5">
+                <label className="flex flex-col gap-1 text-sm font-semibold text-[#003531]">
+                  Medicine name
+                  <input name="medicineName" required maxLength="100" className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base" />
+                </label>
+                <label className="flex flex-col gap-1 text-sm font-semibold text-[#003531]">
+                  Dosage
+                  <input name="dosage" required maxLength="100" placeholder="e.g. 1 tablet" className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base" />
+                </label>
+                <label className="flex flex-col gap-1 text-sm font-semibold text-[#003531]">
+                  Reminder time
+                  <input name="reminderTime" type="time" required className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base" />
+                </label>
+                <label className="flex flex-col gap-1 text-sm font-semibold text-[#003531]">
+                  Frequency
+                  <select name="frequency" defaultValue="DAILY" className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base">
+                    <option value="DAILY">Daily</option>
+                    <option value="WEEKLY">Weekly</option>
+                    <option value="AS_NEEDED">As needed</option>
+                  </select>
+                </label>
+                {reminderFormError && <p role="alert" className="sm:col-span-2 text-sm text-red-700">{reminderFormError}</p>}
+                <button type="submit" disabled={savingReminder} className="sm:col-span-2 h-12 rounded-full bg-[#003531] text-white font-bold disabled:opacity-60">
+                  {savingReminder ? 'Saving…' : 'Save Reminder'}
+                </button>
+              </form>
+            )}
           </section>
 
           {/* Quick Call Family & Doctors Card */}
@@ -321,89 +401,34 @@ const toggleReminder = async (id) => {
             </div>
 
             <div className="flex flex-col gap-4">
-              {/* Daughter */}
-              <div className="p-5 rounded-2xl bg-[#ecf6f4] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm border border-[#dbe5e2]">
-                <div className="flex items-center gap-4">
-                  <div className="relative">
+              {loadingContacts && <p className="text-base text-[#404947]">Loading contacts…</p>}
+              {contactsError && <p role="alert" className="text-base text-red-700">{contactsError}</p>}
+              {!loadingContacts && !contactsError && contacts.length === 0 && (
+                <p className="text-base text-[#404947]">No contacts have been saved yet.</p>
+              )}
+              {contacts.map((contact) => (
+                <div key={contact.id} className="p-5 rounded-2xl bg-[#ecf6f4] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm border border-[#dbe5e2]">
+                  <div className="flex items-center gap-4">
                     <div className="h-16 w-16 rounded-full bg-[#ffdbc9] text-[#321200] flex items-center justify-center font-bold text-2xl shadow-sm">
-                      D
+                      {contact.name?.charAt(0)?.toUpperCase() || '?'}
                     </div>
-                    <span className="absolute bottom-0 right-0 h-4 w-4 rounded-full bg-emerald-600 ring-2 ring-white"></span>
+                    <div>
+                      <h3 className="font-bold text-xl text-[#003531]">{contact.name}</h3>
+                      <p className="text-base text-[#404947]">
+                        {contact.relationship}{contact.emergency ? ' • Emergency contact' : ''}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-xl text-[#003531]">Priya (Daughter)</h3>
-                    <p className="text-base text-[#404947]">Family Member • Active Now</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 sm:gap-3">
                   <a
-                    href="tel:112"
-                    onClick={() => speakText(`Initiating video call to Priya`)}
-                    className="h-14 px-5 rounded-full bg-[#003531] text-white font-semibold text-base flex items-center gap-2 hover:bg-[#0e4d48] active:scale-95 transition-all shadow-sm"
+                    href={`tel:${contact.phone}`}
+                    onClick={() => speakText(`Calling ${contact.name}`)}
+                    className="h-14 px-6 rounded-full bg-[#003531] text-white font-semibold text-base flex items-center justify-center gap-2 hover:bg-[#0e4d48] active:scale-95 transition-all shadow-sm"
                   >
-                    <span className="material-symbols-outlined text-[24px]">videocam</span>
-                    <span>Video Call</span>
-                  </a>
-                  <a
-                    href="tel:112"
-                    onClick={() => speakText(`Calling Priya`)}
-                    className="h-14 px-5 rounded-full bg-[#e6f0ee] text-[#003531] font-semibold text-base flex items-center gap-2 hover:bg-[#dbe5e2] active:scale-95 transition-all"
-                  >
-                    <span className="material-symbols-outlined text-[24px] text-[#994703]">call</span>
-                    <span>Audio Call</span>
+                    <span className="material-symbols-outlined text-[24px]">call</span>
+                    <span>Call {contact.phone}</span>
                   </a>
                 </div>
-              </div>
-
-              {/* Son */}
-              <div className="p-5 rounded-2xl bg-[#ecf6f4] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm border border-[#dbe5e2]">
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <div className="h-16 w-16 rounded-full bg-[#b4eee6] text-[#00201d] flex items-center justify-center font-bold text-2xl shadow-sm">
-                      R
-                    </div>
-                    <span className="absolute bottom-0 right-0 h-4 w-4 rounded-full bg-emerald-600 ring-2 ring-white"></span>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-xl text-[#003531]">Rohan (Son)</h3>
-                      <span className="px-2.5 py-0.5 rounded-full bg-white text-[#003531] text-xs font-semibold">
-                        Available
-                      </span>
-                    </div>
-                    <p className="text-base text-[#404947]">Family Contact • Home</p>
-                  </div>
-                </div>
-                <a
-                  href="tel:112"
-                  onClick={() => speakText(`Calling Rohan`)}
-                  className="h-14 px-6 rounded-full bg-[#003531] text-white font-semibold text-base flex items-center justify-center gap-2 hover:bg-[#0e4d48] active:scale-95 transition-all shadow-sm"
-                >
-                  <span className="material-symbols-outlined text-[24px]">call</span>
-                  <span>Call Direct</span>
-                </a>
-              </div>
-
-              {/* Doctor / Clinic */}
-              <div className="p-5 rounded-2xl bg-[#ecf6f4] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm border border-[#dbe5e2]">
-                <div className="flex items-center gap-4">
-                  <div className="h-16 w-16 rounded-full bg-[#e6f0ee] flex items-center justify-center font-bold text-2xl text-[#994703] shadow-sm">
-                    <span className="material-symbols-outlined text-[32px]">local_hospital</span>
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-xl text-[#003531]">Dr. Sharma (Primary Clinic)</h3>
-                    <p className="text-base text-[#404947]">Healthcare Clinic • Primary Care</p>
-                  </div>
-                </div>
-                <a
-                  href="tel:112"
-                  onClick={() => speakText(`Calling Dr. Sharma Clinic`)}
-                  className="h-14 px-6 rounded-full bg-[#e6f0ee] text-[#003531] font-semibold text-base flex items-center justify-center gap-2 hover:bg-[#dbe5e2] active:scale-95 transition-all"
-                >
-                  <span className="material-symbols-outlined text-[24px] text-[#994703]">call</span>
-                  <span>Call Clinic</span>
-                </a>
-              </div>
+              ))}
             </div>
           </section>
 
@@ -474,7 +499,8 @@ const toggleReminder = async (id) => {
               onClick={() => setShowPhotoModal(true)}
             >
               <img
-                src={memoryPhotoUrl}
+                src={featuredPhotoUrl}
+                onError={(event) => { event.currentTarget.src = memoryPhotoUrl; }}
                 alt="Grandmother and granddaughter laughing warmly while browsing antique photo album"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />
@@ -486,15 +512,20 @@ const toggleReminder = async (id) => {
                 </span>
               </div>
               <div className="absolute bottom-4 left-4 right-4 text-white">
-                <span className="text-xs text-[#84bdb6] block font-medium">Sunday • Photo Album</span>
-                <p className="text-xl font-bold text-white leading-snug">Family Moments &amp; Memories</p>
+                <span className="text-xs text-[#84bdb6] block font-medium">
+                  {featuredMemory?.memoryDate || 'Photo Album'}
+                </span>
+                <p className="text-xl font-bold text-white leading-snug">
+                  {featuredMemory?.title || (loadingMemories ? 'Loading memories…' : 'Family Moments & Memories')}
+                </p>
               </div>
             </div>
 
             <div className="p-6 flex flex-col gap-4">
               <p className="text-base text-[#404947] leading-relaxed">
-                “A cherished afternoon spent together sharing stories and reminiscing over family photo albums.”
+                {memoriesError || featuredMemory?.description || 'Your saved family memories will appear here.'}
               </p>
+              {memoriesError && <p role="alert" className="text-sm text-red-700">{memoriesError}</p>}
               <div className="flex flex-col gap-3">
                 <button
                   type="button"
@@ -632,12 +663,13 @@ const toggleReminder = async (id) => {
             </button>
             <h3 className="font-bold text-2xl text-[#003531]">Family Photo Album</h3>
             <img
-              src={memoryPhotoUrl}
+              src={featuredPhotoUrl}
+              onError={(event) => { event.currentTarget.src = memoryPhotoUrl; }}
               alt="Expanded view of family memory"
               className="w-full max-h-[60vh] object-contain rounded-2xl"
             />
             <p className="text-center text-[#404947] text-base font-medium">
-              “Sharing old stories and precious moments with family.”
+              {featuredMemory?.description || 'Your saved family memories will appear here.'}
             </p>
             <button
               type="button"
