@@ -64,20 +64,18 @@ public class MedicineReminderController {
             @PathVariable Long id,
             @RequestBody Map<String, String> request) {
 
-        String status = request.get("status");
+      String status = request.get("status");
 
-        if (status == null ||
-                !(status.equals("pending")
-                        || status.equals("taken")
-                        || status.equals("skipped"))) {
+if (status == null ||
+        !(status.equals("ACTIVE")
+                || status.equals("INACTIVE"))) {
 
-            return ResponseEntity
-                    .badRequest()
-                    .body(Map.of(
-                            "error",
-                            "Status must be pending, taken, or skipped"));
-        }
-
+    return ResponseEntity
+            .badRequest()
+            .body(Map.of(
+                    "error",
+                    "Status must be ACTIVE or INACTIVE"));
+}
         boolean updated = service.updateStatus(id, status);
 
         if (!updated) {
