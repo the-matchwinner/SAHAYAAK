@@ -1,3 +1,4 @@
+
 package com.sahaayak.backend.dto;
 
 import java.time.LocalDate;
@@ -9,6 +10,7 @@ public class MemoryRequest {
     private String description;
     private LocalDate memoryDate;
     private String imageUrl;
+    private String sourceUrl;
 
     public MemoryRequest() {
     }
@@ -51,5 +53,13 @@ public class MemoryRequest {
 
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
+    }
+
+    public String getSourceUrl() {
+        return sourceUrl;
+    }
+
+    public void setSourceUrl(String sourceUrl) {
+        this.sourceUrl = sourceUrl;
     }
 }

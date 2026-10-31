@@ -1,3 +1,4 @@
+
 package com.sahaayak.backend.model;
 
 import java.time.LocalDate;
@@ -10,19 +11,22 @@ public class Memory {
     private String description;
     private LocalDate memoryDate;
     private String imageUrl;
+    private String sourceUrl;
 
     public Memory() {
     }
 
     public Memory(Long id, Long userId, String title,
             String description, LocalDate memoryDate,
-            String imageUrl) {
+            String imageUrl, String sourceUrl) {
+
         this.id = id;
         this.userId = userId;
         this.title = title;
         this.description = description;
         this.memoryDate = memoryDate;
         this.imageUrl = imageUrl;
+        this.sourceUrl = sourceUrl;
     }
 
     public Long getId() {
@@ -71,5 +75,13 @@ public class Memory {
 
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
+    }
+
+    public String getSourceUrl() {
+        return sourceUrl;
+    }
+
+    public void setSourceUrl(String sourceUrl) {
+        this.sourceUrl = sourceUrl;
     }
 }
