@@ -1,3 +1,4 @@
+
 package com.sahaayak.backend.dto;
 
 import java.time.LocalTime;
@@ -9,6 +10,7 @@ public class MedicineReminderRequest {
     private String dosage;
     private LocalTime reminderTime;
     private String frequency;
+    private String dayOfWeek;
 
     public MedicineReminderRequest() {
     }
@@ -51,5 +53,13 @@ public class MedicineReminderRequest {
 
     public void setFrequency(String frequency) {
         this.frequency = frequency;
+    }
+
+    public String getDayOfWeek() {
+        return dayOfWeek;
+    }
+
+    public void setDayOfWeek(String dayOfWeek) {
+        this.dayOfWeek = dayOfWeek;
     }
 }

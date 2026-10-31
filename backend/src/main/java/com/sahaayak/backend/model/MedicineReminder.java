@@ -1,3 +1,4 @@
+
 package com.sahaayak.backend.model;
 
 import java.time.LocalTime;
@@ -10,20 +11,29 @@ public class MedicineReminder {
     private String dosage;
     private LocalTime reminderTime;
     private String frequency;
+    private String dayOfWeek;
     private String status;
 
     public MedicineReminder() {
     }
 
-    public MedicineReminder(Long id, Long userId, String medicineName,
-            String dosage, LocalTime reminderTime,
-            String frequency, String status) {
+    public MedicineReminder(
+            Long id,
+            Long userId,
+            String medicineName,
+            String dosage,
+            LocalTime reminderTime,
+            String frequency,
+            String dayOfWeek,
+            String status) {
+
         this.id = id;
         this.userId = userId;
         this.medicineName = medicineName;
         this.dosage = dosage;
         this.reminderTime = reminderTime;
         this.frequency = frequency;
+        this.dayOfWeek = dayOfWeek;
         this.status = status;
     }
 
@@ -73,6 +83,14 @@ public class MedicineReminder {
 
     public void setFrequency(String frequency) {
         this.frequency = frequency;
+    }
+
+    public String getDayOfWeek() {
+        return dayOfWeek;
+    }
+
+    public void setDayOfWeek(String dayOfWeek) {
+        this.dayOfWeek = dayOfWeek;
     }
 
     public String getStatus() {

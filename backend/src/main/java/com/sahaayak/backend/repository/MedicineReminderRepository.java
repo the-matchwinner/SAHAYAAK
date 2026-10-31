@@ -1,3 +1,4 @@
+
 package com.sahaayak.backend.repository;
 
 import java.sql.Time;
@@ -29,6 +30,7 @@ public class MedicineReminderRepository {
                 rs.getString("dosage"),
                 time != null ? time.toLocalTime() : null,
                 rs.getString("frequency"),
+                rs.getString("day_of_week"),
                 rs.getString("status"));
     };
 
@@ -36,8 +38,9 @@ public class MedicineReminderRepository {
 
         String sql = """
                 INSERT INTO medicine_reminders
-                (user_id, medicine_name, dosage, reminder_time, frequency, status)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (user_id, medicine_name, dosage, reminder_time,
+                 frequency, day_of_week, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 RETURNING id
                 """;
 
@@ -49,6 +52,7 @@ public class MedicineReminderRepository {
                 reminder.getDosage(),
                 reminder.getReminderTime(),
                 reminder.getFrequency(),
+                reminder.getDayOfWeek(),
                 reminder.getStatus());
 
         reminder.setId(id);
@@ -60,7 +64,7 @@ public class MedicineReminderRepository {
 
         String sql = """
                 SELECT id, user_id, medicine_name, dosage,
-                       reminder_time, frequency, status
+                       reminder_time, frequency, day_of_week, status
                 FROM medicine_reminders
                 WHERE user_id = ?
                 ORDER BY reminder_time
@@ -73,20 +77,26 @@ public class MedicineReminderRepository {
 
         String sql = """
                 SELECT id, user_id, medicine_name, dosage,
-                       reminder_time, frequency, status
+                       reminder_time, frequency, day_of_week, status
                 FROM medicine_reminders
                 WHERE id = ?
                 """;
 
-        List<MedicineReminder> results = jdbcTemplate.query(sql, rowMapper, id);
+        List<MedicineReminder> results =
+                jdbcTemplate.query(sql, rowMapper, id);
 
         return results.isEmpty() ? null : results.get(0);
     }
 
     public boolean update(MedicineReminder reminder) {
+
         String sql = """
                 UPDATE medicine_reminders
-                SET medicine_name = ?, dosage = ?, reminder_time = ?, frequency = ?
+                SET medicine_name = ?,
+                    dosage = ?,
+                    reminder_time = ?,
+                    frequency = ?,
+                    day_of_week = ?
                 WHERE id = ? AND user_id = ?
                 """;
 
@@ -96,6 +106,7 @@ public class MedicineReminderRepository {
                 reminder.getDosage(),
                 reminder.getReminderTime(),
                 reminder.getFrequency(),
+                reminder.getDayOfWeek(),
                 reminder.getId(),
                 reminder.getUserId()) > 0;
     }
