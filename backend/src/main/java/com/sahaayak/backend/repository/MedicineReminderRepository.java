@@ -1,4 +1,3 @@
-
 package com.sahaayak.backend.repository;
 
 import java.sql.Time;
@@ -30,17 +29,18 @@ public class MedicineReminderRepository {
                 rs.getString("dosage"),
                 time != null ? time.toLocalTime() : null,
                 rs.getString("frequency"),
-                rs.getString("day_of_week"),
-                rs.getString("status"));
+                rs.getString("status")
+        );
     };
 
+    // CREATE reminder
     public MedicineReminder save(MedicineReminder reminder) {
 
         String sql = """
                 INSERT INTO medicine_reminders
                 (user_id, medicine_name, dosage, reminder_time,
-                 frequency, day_of_week, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                 frequency, status)
+                VALUES (?, ?, ?, ?, ?, ?)
                 RETURNING id
                 """;
 
@@ -50,34 +50,38 @@ public class MedicineReminderRepository {
                 reminder.getUserId(),
                 reminder.getMedicineName(),
                 reminder.getDosage(),
-                reminder.getReminderTime(),
+                reminder.getReminderTime() != null
+                        ? Time.valueOf(reminder.getReminderTime())
+                        : null,
                 reminder.getFrequency(),
-                reminder.getDayOfWeek(),
-                reminder.getStatus());
+                reminder.getStatus()
+        );
 
         reminder.setId(id);
 
         return reminder;
     }
 
+    // GET all reminders for a user
     public List<MedicineReminder> findByUserId(Long userId) {
 
         String sql = """
                 SELECT id, user_id, medicine_name, dosage,
-                       reminder_time, frequency, day_of_week, status
+                       reminder_time, frequency, status
                 FROM medicine_reminders
                 WHERE user_id = ?
-                ORDER BY reminder_time
+                ORDER BY reminder_time NULLS LAST, id
                 """;
 
         return jdbcTemplate.query(sql, rowMapper, userId);
     }
 
+    // GET reminder by ID
     public MedicineReminder findById(Long id) {
 
         String sql = """
                 SELECT id, user_id, medicine_name, dosage,
-                       reminder_time, frequency, day_of_week, status
+                       reminder_time, frequency, status
                 FROM medicine_reminders
                 WHERE id = ?
                 """;
@@ -88,6 +92,7 @@ public class MedicineReminderRepository {
         return results.isEmpty() ? null : results.get(0);
     }
 
+    // UPDATE reminder
     public boolean update(MedicineReminder reminder) {
 
         String sql = """
@@ -95,8 +100,7 @@ public class MedicineReminderRepository {
                 SET medicine_name = ?,
                     dosage = ?,
                     reminder_time = ?,
-                    frequency = ?,
-                    day_of_week = ?
+                    frequency = ?
                 WHERE id = ? AND user_id = ?
                 """;
 
@@ -104,13 +108,16 @@ public class MedicineReminderRepository {
                 sql,
                 reminder.getMedicineName(),
                 reminder.getDosage(),
-                reminder.getReminderTime(),
+                reminder.getReminderTime() != null
+                        ? Time.valueOf(reminder.getReminderTime())
+                        : null,
                 reminder.getFrequency(),
-                reminder.getDayOfWeek(),
                 reminder.getId(),
-                reminder.getUserId()) > 0;
+                reminder.getUserId()
+        ) > 0;
     }
 
+    // ACTIVATE OR DEACTIVATE reminder
     public boolean updateStatus(Long id, String status) {
 
         String sql = """
@@ -122,6 +129,7 @@ public class MedicineReminderRepository {
         return jdbcTemplate.update(sql, status, id) > 0;
     }
 
+    // DELETE reminder
     public boolean delete(Long id) {
 
         String sql = """
