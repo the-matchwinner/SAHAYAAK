@@ -1,10 +1,8 @@
-
-
 package com.sahaayak.backend.controller;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Locale;
+import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -69,7 +67,8 @@ public class MedicineReminderController {
                     .status(HttpStatus.NOT_FOUND)
                     .body(Map.of(
                             "error",
-                            "Medicine reminder not found"));
+                            "Medicine reminder not found"
+                    ));
         }
 
         return ResponseEntity.ok(reminder);
@@ -89,7 +88,8 @@ public class MedicineReminderController {
                     .status(HttpStatus.NOT_FOUND)
                     .body(Map.of(
                             "error",
-                            "Medicine reminder not found"));
+                            "Medicine reminder not found"
+                    ));
         }
 
         return ResponseEntity.ok(updated);
@@ -107,15 +107,16 @@ public class MedicineReminderController {
             status = status.trim().toUpperCase(Locale.ROOT);
         }
 
-        if (status == null ||
-                !(status.equals("ACTIVE")
+        if (status == null
+                || !(status.equals("ACTIVE")
                 || status.equals("INACTIVE"))) {
 
             return ResponseEntity
                     .badRequest()
                     .body(Map.of(
                             "error",
-                            "Status must be ACTIVE or INACTIVE"));
+                            "Status must be ACTIVE or INACTIVE"
+                    ));
         }
 
         boolean updated = service.updateStatus(id, status);
@@ -125,13 +126,16 @@ public class MedicineReminderController {
                     .status(HttpStatus.NOT_FOUND)
                     .body(Map.of(
                             "error",
-                            "Medicine reminder not found"));
+                            "Medicine reminder not found"
+                    ));
         }
 
         return ResponseEntity.ok(
                 Map.of(
                         "message",
-                        "Reminder status updated successfully"));
+                        "Reminder status updated successfully"
+                )
+        );
     }
 
     // DELETE reminder
@@ -146,16 +150,19 @@ public class MedicineReminderController {
                     .status(HttpStatus.NOT_FOUND)
                     .body(Map.of(
                             "error",
-                            "Medicine reminder not found"));
+                            "Medicine reminder not found"
+                    ));
         }
 
         return ResponseEntity.ok(
                 Map.of(
                         "message",
-                        "Medicine reminder deleted successfully"));
+                        "Medicine reminder deleted successfully"
+                )
+        );
     }
 
-    // HANDLE INVALID REMINDER SCHEDULES
+    // HANDLE INVALID REMINDER REQUESTS
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleValidationError(
             IllegalArgumentException exception) {
@@ -164,6 +171,7 @@ public class MedicineReminderController {
                 .badRequest()
                 .body(Map.of(
                         "error",
-                        exception.getMessage()));
+                        exception.getMessage()
+                ));
     }
 }
