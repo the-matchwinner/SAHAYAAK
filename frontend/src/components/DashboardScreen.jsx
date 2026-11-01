@@ -35,6 +35,9 @@ export default function DashboardScreen({ userName, onNavigate }) {
   const [editingMemory, setEditingMemory] = useState(null);
   const [savingMemory, setSavingMemory] = useState(false);
   const [memoryFormError, setMemoryFormError] = useState('');
+  const [linkPreview, setLinkPreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState('');
   const [activeMemoryId, setActiveMemoryId] = useState(null);
 
   const formatReminderTime = (time) => {
@@ -322,18 +325,61 @@ export default function DashboardScreen({ userName, onNavigate }) {
     }
   };
 
+  const previewMemoryLink = async (event) => {
+    const form = event.currentTarget.form;
+    const formData = new FormData(form);
+    const url = formData.get('sourceUrl')?.trim();
+
+    if (!url) {
+      setPreviewError('Please paste a family memory link first.');
+      return;
+    }
+
+    setPreviewLoading(true);
+    setPreviewError('');
+    setLinkPreview(null);
+
+    try {
+      const preview = await fetchApi('/link-preview', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url }),
+      });
+
+      setLinkPreview(preview);
+    } catch (error) {
+      console.error('Link preview failed:', error);
+      setPreviewError(
+        'Could not generate the preview. This website may block preview requests.'
+      );
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   const saveMemory = async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
     setSavingMemory(true);
     setMemoryFormError('');
+    const sourceUrl = formData.get('sourceUrl')?.trim() || '';
+
+    const manualImageUrl = formData.get('imageUrl')?.trim() || '';
+
     const request = {
       userId: USER_ID,
       title: formData.get('title').trim(),
       description: formData.get('description').trim(),
       memoryDate: formData.get('memoryDate') || null,
-      imageUrl: formData.get('imageUrl').trim() || null,
+      sourceUrl: sourceUrl || null,
+
+      imageUrl: manualImageUrl ||
+        (linkPreview?.url === sourceUrl
+          ? linkPreview.imageUrl
+          : null),
     };
 
     try {
@@ -743,62 +789,7 @@ export default function DashboardScreen({ userName, onNavigate }) {
             )}
           </section>
 
-          {/* Easy App Launches */}
-          <section className="bg-white rounded-2xl p-6 sm:p-8 shadow-md border border-[#dbe5e2]">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="h-12 w-12 rounded-full bg-[#e6f0ee] flex items-center justify-center text-[#003531] shadow-sm">
-                <span className="material-symbols-outlined text-[28px]">apps</span>
-              </div>
-              <div>
-                <h2 className="font-bold text-2xl text-[#003531]">Easy App Launches</h2>
-                <span className="text-base text-[#404947]">Big friendly buttons for your daily apps</span>
-              </div>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <button
-                type="button"
-                onClick={() => speakText("Opening WhatsApp Family Chat")}
-                className="h-20 px-4 rounded-2xl bg-[#ecf6f4] hover:bg-[#e6f0ee] hover:scale-105 active:scale-95 flex items-center gap-3 transition-all shadow-sm group border border-[#bfc8c6]/40 cursor-pointer"
-              >
-                <div className="h-12 w-12 rounded-full bg-[#003531] flex items-center justify-center text-white shrink-0 shadow-sm">
-                  <span className="material-symbols-outlined text-[28px]">chat</span>
-                </div>
-                <div className="flex flex-col text-left">
-                  <span className="font-bold text-lg text-[#003531] leading-tight">WhatsApp</span>
-                  <span className="text-xs text-[#404947]">Family Chat</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => speakText("Opening Facebook")}
-                className="h-20 px-4 rounded-2xl bg-[#ecf6f4] hover:bg-[#e6f0ee] hover:scale-105 active:scale-95 flex items-center gap-3 transition-all shadow-sm group border border-[#bfc8c6]/40 cursor-pointer"
-              >
-                <div className="h-12 w-12 rounded-full bg-[#994703] flex items-center justify-center text-white shrink-0 shadow-sm">
-                  <span className="material-symbols-outlined text-[28px]">groups</span>
-                </div>
-                <div className="flex flex-col text-left">
-                  <span className="font-bold text-lg text-[#003531] leading-tight">Facebook</span>
-                  <span className="text-xs text-[#404947]">See Friends</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => speakText("Opening Phone Keypad")}
-                className="h-20 px-4 rounded-2xl bg-[#ecf6f4] hover:bg-[#e6f0ee] hover:scale-105 active:scale-95 flex items-center gap-3 transition-all shadow-sm group border border-[#bfc8c6]/40 cursor-pointer"
-              >
-                <div className="h-12 w-12 rounded-full bg-[#0e4d48] flex items-center justify-center text-white shrink-0 shadow-sm">
-                  <span className="material-symbols-outlined text-[28px]">dialpad</span>
-                </div>
-                <div className="flex flex-col text-left">
-                  <span className="font-bold text-lg text-[#003531] leading-tight">Dial Phone</span>
-                  <span className="text-xs text-[#404947]">Keypad</span>
-                </div>
-              </button>
-            </div>
-          </section>
         </div>
 
         {/* RIGHT COLUMN (5 Cols): Memory Lane & Serenity */}
@@ -892,6 +883,75 @@ export default function DashboardScreen({ userName, onNavigate }) {
                     Photo URL
                     <input name="imageUrl" type="url" maxLength="2000" placeholder="https://…" defaultValue={editingMemory?.imageUrl || ''} className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base" />
                   </label>
+
+                  <label className="flex flex-col gap-1 text-sm font-semibold text-[#003531]">
+                    Family Memory Link
+
+                    <input
+                      name="sourceUrl"
+                      type="url"
+                      maxLength="2000"
+                      placeholder="Paste your family photo or memory link"
+                      defaultValue={editingMemory?.sourceUrl || ''}
+                      onChange={() => {
+                        setLinkPreview(null);
+                        setPreviewError('');
+                      }}
+                      className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base"
+                    />
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={previewMemoryLink}
+                    disabled={previewLoading}
+                    className="sm:col-span-2 h-12 rounded-full bg-[#003531] text-white font-bold disabled:opacity-60"
+                  >
+                    {previewLoading ? 'Generating Preview...' : 'Generate Link Preview'}
+                  </button>
+
+                  {previewError && (
+                    <p className="sm:col-span-2 text-sm text-red-700" role="alert">
+                      {previewError}
+                    </p>
+                  )}
+
+                  {linkPreview && (
+                    <div className="sm:col-span-2 rounded-2xl border border-[#bfc8c6] bg-white overflow-hidden shadow-sm">
+
+                      {linkPreview.imageUrl && (
+                        <img
+                          src={linkPreview.imageUrl}
+                          alt="Family memory preview"
+                          className="w-full h-48 object-cover"
+                        />
+                      )}
+
+                      <div className="p-4">
+                        <p className="text-sm font-semibold text-[#994703]">
+                          {linkPreview.siteName || 'Family Memory Preview'}
+                        </p>
+
+                        <h3 className="mt-1 text-lg font-bold text-[#003531]">
+                          {linkPreview.title || 'Memory Link'}
+                        </h3>
+
+                        <p className="mt-2 text-sm text-[#404947]">
+                          {linkPreview.description || 'No description available.'}
+                        </p>
+
+                        <a
+                          href={linkPreview.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-3 inline-block text-sm font-bold text-[#003531] underline"
+                        >
+                          Open Original Link
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
                   {memoryFormError && <p role="alert" className="text-sm text-red-700">{memoryFormError}</p>}
                   <button type="submit" disabled={savingMemory} className="h-12 rounded-full bg-[#003531] text-white font-bold disabled:opacity-60">
                     {savingMemory ? 'Saving…' : editingMemory ? 'Save Changes' : 'Save Memory'}
@@ -981,20 +1041,10 @@ export default function DashboardScreen({ userName, onNavigate }) {
               </button>
             </div>
           </section>
-
-          {/* Status Bar */}
-          <div className="p-4 rounded-xl bg-[#ecf6f4] flex items-center justify-between text-[#404947] border border-[#dbe5e2]">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[#994703] text-[24px]">wifi</span>
-              <span className="text-sm font-semibold">Home Wi-Fi Strong</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[#003531] text-[24px]">battery_charging_full</span>
-              <span className="text-sm font-semibold">Tablet 92% Charged</span>
-            </div>
-          </div>
         </div>
       </div>
+
+
 
       {/* Daily Medicine Reminder Popup */}
       {dueReminder && (
@@ -1079,6 +1129,16 @@ export default function DashboardScreen({ userName, onNavigate }) {
                   <h4 className="text-xl font-bold text-[#003531]">{selectedMemory.title}</h4>
                   {selectedMemory.memoryDate && <p className="text-sm text-[#707977]">{selectedMemory.memoryDate}</p>}
                   {selectedMemory.description && <p className="mt-2 text-[#404947]">{selectedMemory.description}</p>}
+                  {selectedMemory.sourceUrl && (
+                    <a
+                      href={selectedMemory.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 text-sm font-bold text-[#003531] underline"
+                    >
+                      Open Original Family Memory
+                    </a>
+                  )}
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">
                   <button type="button" onClick={() => { setEditingMemory(selectedMemory); setMemoryFormError(''); setShowMemoryForm(true); setShowPhotoModal(false); }} className="h-11 px-4 rounded-full bg-[#e6f0ee] text-[#003531] font-semibold text-sm">Edit Memory</button>
