@@ -1,12 +1,14 @@
 package com.sahaayak.backend.controller;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,11 +28,11 @@ public class MedicineReminderController {
 
     private final MedicineReminderService service;
 
-    public MedicineReminderController(
-            MedicineReminderService service) {
+    public MedicineReminderController(MedicineReminderService service) {
         this.service = service;
     }
 
+    // CREATE reminder
     @PostMapping
     public ResponseEntity<MedicineReminder> createReminder(
             @RequestBody MedicineReminderRequest request) {
@@ -42,28 +44,18 @@ public class MedicineReminderController {
                 .body(reminder);
     }
 
+    // GET all reminders for a user
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<MedicineReminder>> getReminders(
             @PathVariable Long userId) {
 
-        List<MedicineReminder> reminders = service.getRemindersByUserId(userId);
+        List<MedicineReminder> reminders =
+                service.getRemindersByUserId(userId);
 
         return ResponseEntity.ok(reminders);
     }
 
-        @PutMapping("/{id}")
-        public ResponseEntity<?> updateReminder(
-                        @PathVariable Long id,
-                        @RequestBody MedicineReminderRequest request) {
-
-                MedicineReminder updated = service.updateReminder(id, request);
-                if (updated == null) {
-                        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                                        .body(Map.of("error", "Medicine reminder not found"));
-                }
-                return ResponseEntity.ok(updated);
-        }
-
+    // GET reminder by ID
     @GetMapping("/{id}")
     public ResponseEntity<?> getReminder(
             @PathVariable Long id) {
@@ -75,29 +67,58 @@ public class MedicineReminderController {
                     .status(HttpStatus.NOT_FOUND)
                     .body(Map.of(
                             "error",
-                            "Medicine reminder not found"));
+                            "Medicine reminder not found"
+                    ));
         }
 
         return ResponseEntity.ok(reminder);
     }
 
+    // UPDATE reminder
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateReminder(
+            @PathVariable Long id,
+            @RequestBody MedicineReminderRequest request) {
+
+        MedicineReminder updated =
+                service.updateReminder(id, request);
+
+        if (updated == null) {
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body(Map.of(
+                            "error",
+                            "Medicine reminder not found"
+                    ));
+        }
+
+        return ResponseEntity.ok(updated);
+    }
+
+    // ACTIVATE OR DEACTIVATE reminder
     @PutMapping("/{id}/status")
     public ResponseEntity<?> updateStatus(
             @PathVariable Long id,
             @RequestBody Map<String, String> request) {
 
-      String status = request.get("status");
+        String status = request.get("status");
 
-if (status == null ||
-        !(status.equals("ACTIVE")
+        if (status != null) {
+            status = status.trim().toUpperCase(Locale.ROOT);
+        }
+
+        if (status == null
+                || !(status.equals("ACTIVE")
                 || status.equals("INACTIVE"))) {
 
-    return ResponseEntity
-            .badRequest()
-            .body(Map.of(
-                    "error",
-                    "Status must be ACTIVE or INACTIVE"));
-}
+            return ResponseEntity
+                    .badRequest()
+                    .body(Map.of(
+                            "error",
+                            "Status must be ACTIVE or INACTIVE"
+                    ));
+        }
+
         boolean updated = service.updateStatus(id, status);
 
         if (!updated) {
@@ -105,15 +126,19 @@ if (status == null ||
                     .status(HttpStatus.NOT_FOUND)
                     .body(Map.of(
                             "error",
-                            "Medicine reminder not found"));
+                            "Medicine reminder not found"
+                    ));
         }
 
         return ResponseEntity.ok(
                 Map.of(
                         "message",
-                        "Reminder status updated successfully"));
+                        "Reminder status updated successfully"
+                )
+        );
     }
 
+    // DELETE reminder
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteReminder(
             @PathVariable Long id) {
@@ -125,12 +150,28 @@ if (status == null ||
                     .status(HttpStatus.NOT_FOUND)
                     .body(Map.of(
                             "error",
-                            "Medicine reminder not found"));
+                            "Medicine reminder not found"
+                    ));
         }
 
         return ResponseEntity.ok(
                 Map.of(
                         "message",
-                        "Medicine reminder deleted successfully"));
+                        "Medicine reminder deleted successfully"
+                )
+        );
+    }
+
+    // HANDLE INVALID REMINDER REQUESTS
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, String>> handleValidationError(
+            IllegalArgumentException exception) {
+
+        return ResponseEntity
+                .badRequest()
+                .body(Map.of(
+                        "error",
+                        exception.getMessage()
+                ));
     }
 }
