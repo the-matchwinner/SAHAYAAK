@@ -53,6 +53,7 @@ CREATE TABLE memories (
     description TEXT,
     memory_date DATE,
     image_url TEXT,
+    source_url TEXT,
 
     CONSTRAINT fk_memories_user
         FOREIGN KEY (user_id)
