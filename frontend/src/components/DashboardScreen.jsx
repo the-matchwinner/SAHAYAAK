@@ -25,6 +25,8 @@ export default function DashboardScreen({ userName, onNavigate }) {
   const [editingReminder, setEditingReminder] = useState(null);
   const [savingReminder, setSavingReminder] = useState(false);
   const [reminderFormError, setReminderFormError] = useState('');
+  const [reminderFrequency, setReminderFrequency] = useState('DAILY');
+  const [dueReminder, setDueReminder] = useState(null);
   const [showContactForm, setShowContactForm] = useState(false);
   const [editingContact, setEditingContact] = useState(null);
   const [savingContact, setSavingContact] = useState(false);
@@ -46,9 +48,12 @@ export default function DashboardScreen({ userName, onNavigate }) {
     id: item.id,
     title: item.medicineName,
     rawTime: item.reminderTime?.slice(0, 5) || '',
-    time: formatReminderTime(item.reminderTime),
+    time: item.reminderTime
+      ? formatReminderTime(item.reminderTime)
+      : 'As needed',
     note: item.dosage,
-    subtitle: item.frequency,
+    frequency: item.frequency,
+    subtitle: item.frequency === 'AS_NEEDED' ? 'No fixed time' : 'Daily',
     icon: 'medication',
     active: item.status === 'ACTIVE',
   });
@@ -68,7 +73,12 @@ export default function DashboardScreen({ userName, onNavigate }) {
     ]);
 
     if (isCurrent()) {
-      if (results[0].status === 'fulfilled') setReminders(results[0].value.map(mapReminder));
+      if (results[0].status === 'fulfilled') {
+        const supportedReminders = results[0].value.filter((item) =>
+          ['DAILY', 'AS_NEEDED'].includes(String(item.frequency || '').toUpperCase())
+        );
+        setReminders(supportedReminders.map(mapReminder));
+      }
       else {
         console.error('Failed to load reminders:', results[0].reason);
         setRemindersError('Could not load reminders. Check the backend connection, then retry.');
@@ -95,6 +105,65 @@ export default function DashboardScreen({ userName, onNavigate }) {
     return () => { isMounted = false; };
   }, []);
 
+  // Check daily reminders while the dashboard is open.
+  // A reminder can still appear for five minutes after its scheduled time,
+  // so a delayed browser timer or page refresh does not cause it to be missed.
+  useEffect(() => {
+    if (dueReminder) return undefined;
+
+    const checkForDueReminders = () => {
+      if (document.visibilityState === 'hidden') return;
+
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+      const due = reminders.find((reminder) => {
+        if (!reminder.active || reminder.frequency !== 'DAILY' || !reminder.rawTime) {
+          return false;
+        }
+
+        const [hours, minutes] = reminder.rawTime.split(':').map(Number);
+        if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return false;
+
+        const scheduledMinutes = hours * 60 + minutes;
+        const minutesLate = currentMinutes - scheduledMinutes;
+        if (minutesLate < 0 || minutesLate > 5) return false;
+
+        // Only mark a reminder after the user responds to the pop-up.
+        // A new key prefix also ignores flags written by the earlier checker.
+        const storageKey = `sahaayak-reminder-dismissed-${today}-${reminder.id}`;
+        return window.localStorage.getItem(storageKey) !== 'yes';
+      });
+
+      if (due) setDueReminder({ ...due, reminderDate: today });
+    };
+
+    checkForDueReminders();
+
+    const intervalId = window.setInterval(checkForDueReminders, 10000);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') checkForDueReminders();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', checkForDueReminders);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', checkForDueReminders);
+    };
+  }, [reminders, dueReminder]);
+
+  const closeDueReminder = () => {
+    if (dueReminder) {
+      const storageKey = `sahaayak-reminder-dismissed-${dueReminder.reminderDate}-${dueReminder.id}`;
+      window.localStorage.setItem(storageKey, 'yes');
+    }
+    setDueReminder(null);
+  };
+
   // State for voice note audio simulation
   const [voicePlaying, setVoicePlaying] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
@@ -106,15 +175,15 @@ export default function DashboardScreen({ userName, onNavigate }) {
   const selectedMemory = memories.find((memory) => memory.id === activeMemoryId) || featuredMemory;
   const selectedMemoryPhotoUrl = selectedMemory?.imageUrl || memoryPhotoUrl;
 
-const toggleReminder = async (id) => {
-  const reminder = reminders.find((item) => item.id === id);
+  const toggleReminder = async (id) => {
+    const reminder = reminders.find((item) => item.id === id);
 
-  if (!reminder) return;
+    if (!reminder) return;
 
-  const newStatus = reminder.active ? 'INACTIVE' : 'ACTIVE';
+    const newStatus = reminder.active ? 'INACTIVE' : 'ACTIVE';
 
-  try {
-    await fetchApi(`/reminders/${id}/status`, {
+    try {
+      await fetchApi(`/reminders/${id}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -124,166 +193,187 @@ const toggleReminder = async (id) => {
         }),
       });
 
-    setReminders((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? { ...item, active: !item.active }
-          : item
-      )
-    );
-  } catch (error) {
-    console.error('Failed to update reminder status:', error);
-    setRemindersError('Could not update this reminder. Please try again.');
-  }
-};
+      setReminders((prev) =>
+        prev.map((item) =>
+          item.id === id
+            ? { ...item, active: !item.active }
+            : item
+        )
+      );
 
-const saveReminder = async (event) => {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const formData = new FormData(form);
-  setSavingReminder(true);
-  setReminderFormError('');
-
-  try {
-    const savedReminder = await fetchApi(
-      editingReminder ? `/reminders/${editingReminder.id}` : '/reminders',
-      {
-      method: editingReminder ? 'PUT' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: USER_ID,
-        medicineName: formData.get('medicineName').trim(),
-        dosage: formData.get('dosage').trim(),
-        reminderTime: formData.get('reminderTime'),
-        frequency: formData.get('frequency'),
-      }),
+      if (newStatus === 'INACTIVE') {
+        setDueReminder((current) => current?.id === id ? null : current);
       }
-    );
-    setReminders((current) => editingReminder
-      ? current.map((item) => item.id === savedReminder.id ? mapReminder(savedReminder) : item)
-      : [...current, mapReminder(savedReminder)]);
-    form.reset();
-    setShowReminderForm(false);
-    setEditingReminder(null);
-  } catch (error) {
-    console.error('Failed to create reminder:', error);
-    setReminderFormError('Could not save the reminder. Check the backend connection and try again.');
-  } finally {
-    setSavingReminder(false);
-  }
-};
-
-const deleteReminder = async (reminder) => {
-  if (!window.confirm(`Delete the reminder for ${reminder.title}?`)) return;
-  try {
-    await fetchApi(`/reminders/${reminder.id}`, { method: 'DELETE' });
-    setReminders((current) => current.filter((item) => item.id !== reminder.id));
-  } catch (error) {
-    console.error('Failed to delete reminder:', error);
-    setRemindersError('Could not delete this reminder. Please try again.');
-  }
-};
-
-const saveContact = async (event) => {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const formData = new FormData(form);
-  setSavingContact(true);
-  setContactFormError('');
-  const request = {
-    userId: USER_ID,
-    name: formData.get('name').trim(),
-    relationship: formData.get('relationship').trim(),
-    phone: formData.get('phone').trim(),
-    emergency: formData.get('emergency') === 'on',
+    } catch (error) {
+      console.error('Failed to update reminder status:', error);
+      setRemindersError('Could not update this reminder. Please try again.');
+    }
   };
 
-  try {
-    const saved = await fetchApi(
-      editingContact ? `/contacts/${editingContact.id}` : '/contacts',
-      {
-        method: editingContact ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(request),
-      }
-    );
-    setContacts((current) => editingContact
-      ? current.map((contact) => contact.id === saved.id ? saved : contact)
-      : [...current, saved]);
-    form.reset();
-    setShowContactForm(false);
-    setEditingContact(null);
-  } catch (error) {
-    console.error('Failed to save contact:', error);
-    setContactFormError('Could not save the contact. Check the backend connection and try again.');
-  } finally {
-    setSavingContact(false);
-  }
-};
+  const saveReminder = async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const frequency = formData.get('frequency');
+    const reminderTime = frequency === 'DAILY'
+      ? formData.get('reminderTime')
+      : null;
 
-const deleteContact = async (contact) => {
-  if (!window.confirm(`Delete ${contact.name} from contacts?`)) return;
-  try {
-    await fetchApi(`/contacts/${contact.id}`, { method: 'DELETE' });
-    setContacts((current) => current.filter((item) => item.id !== contact.id));
-  } catch (error) {
-    console.error('Failed to delete contact:', error);
-    setContactsError('Could not delete this contact. Please try again.');
-  }
-};
+    if (frequency === 'DAILY' && !reminderTime) {
+      setReminderFormError('Please select a time for a daily medicine reminder.');
+      return;
+    }
 
-const saveMemory = async (event) => {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const formData = new FormData(form);
-  setSavingMemory(true);
-  setMemoryFormError('');
-  const request = {
-    userId: USER_ID,
-    title: formData.get('title').trim(),
-    description: formData.get('description').trim(),
-    memoryDate: formData.get('memoryDate') || null,
-    imageUrl: formData.get('imageUrl').trim() || null,
+    setSavingReminder(true);
+    setReminderFormError('');
+
+    try {
+      const savedReminder = await fetchApi(
+        editingReminder ? `/reminders/${editingReminder.id}` : '/reminders',
+        {
+          method: editingReminder ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: USER_ID,
+            medicineName: formData.get('medicineName').trim(),
+            dosage: formData.get('dosage').trim(),
+            reminderTime,
+            frequency,
+          }),
+        }
+      );
+
+      setReminders((current) => editingReminder
+        ? current.map((item) => item.id === savedReminder.id ? mapReminder(savedReminder) : item)
+        : [...current, mapReminder(savedReminder)]);
+
+      form.reset();
+      setShowReminderForm(false);
+      setEditingReminder(null);
+      setReminderFrequency('DAILY');
+      setDueReminder((current) => (
+        current?.id === savedReminder.id ? null : current
+      ));
+    } catch (error) {
+      console.error('Failed to save reminder:', error);
+      setReminderFormError('Could not save the reminder. Check the backend connection and try again.');
+    } finally {
+      setSavingReminder(false);
+    }
   };
 
-  try {
-    const saved = await fetchApi(
-      editingMemory ? `/memories/${editingMemory.id}` : '/memories',
-      {
-        method: editingMemory ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(request),
-      }
-    );
-    setMemories((current) => editingMemory
-      ? current.map((memory) => memory.id === saved.id ? saved : memory)
-      : [saved, ...current]);
-    setActiveMemoryId(saved.id);
-    form.reset();
-    setShowMemoryForm(false);
-    setEditingMemory(null);
-  } catch (error) {
-    console.error('Failed to save memory:', error);
-    setMemoryFormError('Could not save the memory. Check the backend connection and try again.');
-  } finally {
-    setSavingMemory(false);
-  }
-};
+  const deleteReminder = async (reminder) => {
+    if (!window.confirm(`Delete the reminder for ${reminder.title}?`)) return;
+    try {
+      await fetchApi(`/reminders/${reminder.id}`, { method: 'DELETE' });
+      setReminders((current) => current.filter((item) => item.id !== reminder.id));
+      setDueReminder((current) => current?.id === reminder.id ? null : current);
+    } catch (error) {
+      console.error('Failed to delete reminder:', error);
+      setRemindersError('Could not delete this reminder. Please try again.');
+    }
+  };
 
-const deleteMemory = async (memory) => {
-  if (!window.confirm(`Delete “${memory.title}” from your memories?`)) return;
-  try {
-    await fetchApi(`/memories/${memory.id}`, { method: 'DELETE' });
-    setMemories((current) => {
-      const remaining = current.filter((item) => item.id !== memory.id);
-      setActiveMemoryId(remaining[0]?.id ?? null);
-      return remaining;
-    });
-  } catch (error) {
-    console.error('Failed to delete memory:', error);
-    setMemoriesError('Could not delete this memory. Please try again.');
-  }
-};
+  const saveContact = async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    setSavingContact(true);
+    setContactFormError('');
+    const request = {
+      userId: USER_ID,
+      name: formData.get('name').trim(),
+      relationship: formData.get('relationship').trim(),
+      phone: formData.get('phone').trim(),
+      emergency: formData.get('emergency') === 'on',
+    };
+
+    try {
+      const saved = await fetchApi(
+        editingContact ? `/contacts/${editingContact.id}` : '/contacts',
+        {
+          method: editingContact ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(request),
+        }
+      );
+      setContacts((current) => editingContact
+        ? current.map((contact) => contact.id === saved.id ? saved : contact)
+        : [...current, saved]);
+      form.reset();
+      setShowContactForm(false);
+      setEditingContact(null);
+    } catch (error) {
+      console.error('Failed to save contact:', error);
+      setContactFormError('Could not save the contact. Check the backend connection and try again.');
+    } finally {
+      setSavingContact(false);
+    }
+  };
+
+  const deleteContact = async (contact) => {
+    if (!window.confirm(`Delete ${contact.name} from contacts?`)) return;
+    try {
+      await fetchApi(`/contacts/${contact.id}`, { method: 'DELETE' });
+      setContacts((current) => current.filter((item) => item.id !== contact.id));
+    } catch (error) {
+      console.error('Failed to delete contact:', error);
+      setContactsError('Could not delete this contact. Please try again.');
+    }
+  };
+
+  const saveMemory = async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    setSavingMemory(true);
+    setMemoryFormError('');
+    const request = {
+      userId: USER_ID,
+      title: formData.get('title').trim(),
+      description: formData.get('description').trim(),
+      memoryDate: formData.get('memoryDate') || null,
+      imageUrl: formData.get('imageUrl').trim() || null,
+    };
+
+    try {
+      const saved = await fetchApi(
+        editingMemory ? `/memories/${editingMemory.id}` : '/memories',
+        {
+          method: editingMemory ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(request),
+        }
+      );
+      setMemories((current) => editingMemory
+        ? current.map((memory) => memory.id === saved.id ? saved : memory)
+        : [saved, ...current]);
+      setActiveMemoryId(saved.id);
+      form.reset();
+      setShowMemoryForm(false);
+      setEditingMemory(null);
+    } catch (error) {
+      console.error('Failed to save memory:', error);
+      setMemoryFormError('Could not save the memory. Check the backend connection and try again.');
+    } finally {
+      setSavingMemory(false);
+    }
+  };
+
+  const deleteMemory = async (memory) => {
+    if (!window.confirm(`Delete “${memory.title}” from your memories?`)) return;
+    try {
+      await fetchApi(`/memories/${memory.id}`, { method: 'DELETE' });
+      setMemories((current) => {
+        const remaining = current.filter((item) => item.id !== memory.id);
+        setActiveMemoryId(remaining[0]?.id ?? null);
+        return remaining;
+      });
+    } catch (error) {
+      console.error('Failed to delete memory:', error);
+      setMemoriesError('Could not delete this memory. Please try again.');
+    }
+  };
 
   const speakText = (phrase) => {
     if ('speechSynthesis' in window) {
@@ -446,19 +536,17 @@ const deleteMemory = async (memory) => {
               {reminders.map((rem) => (
                 <div
                   key={rem.id}
-                  className={`p-5 rounded-2xl border-2 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-                    !rem.active
-                      ? 'bg-[#f2fbf9] border-[#dbe5e2] opacity-75'
-                      : rem.id === 1
+                  className={`p-5 rounded-2xl border-2 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${!rem.active
+                    ? 'bg-[#f2fbf9] border-[#dbe5e2] opacity-75'
+                    : rem.id === 1
                       ? 'bg-[#ecf6f4] border-[#fc934f] shadow-sm'
                       : 'bg-[#ecf6f4] border-[#dbe5e2]'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-start gap-4">
                     <div
-                      className={`h-14 w-14 rounded-full flex items-center justify-center shrink-0 shadow-md ${
-                        !rem.active ? 'bg-gray-200 text-gray-500' : 'bg-[#994703] text-white'
-                      }`}
+                      className={`h-14 w-14 rounded-full flex items-center justify-center shrink-0 shadow-md ${!rem.active ? 'bg-gray-200 text-gray-500' : 'bg-[#994703] text-white'
+                        }`}
                     >
                       <span className="material-symbols-outlined text-[30px]">{rem.icon}</span>
                     </div>
@@ -481,18 +569,17 @@ const deleteMemory = async (memory) => {
                     <button
                       type="button"
                       onClick={() => toggleReminder(rem.id)}
-                      className={`h-12 px-4 rounded-full font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm ${
-                        !rem.active
-                          ? 'bg-[#e6f0ee] text-[#707977]'
-                          : 'bg-[#003531] text-white hover:bg-[#0e4d48] active:scale-95'
-                      }`}
+                      className={`h-12 px-4 rounded-full font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm ${!rem.active
+                        ? 'bg-[#e6f0ee] text-[#707977]'
+                        : 'bg-[#003531] text-white hover:bg-[#0e4d48] active:scale-95'
+                        }`}
                     >
                       <span className="material-symbols-outlined text-[20px]">
                         {rem.active ? 'toggle_on' : 'toggle_off'}
                       </span>
                       <span>{rem.active ? 'Disable' : 'Enable'}</span>
                     </button>
-                    <button type="button" onClick={() => { setEditingReminder(rem); setReminderFormError(''); setShowReminderForm(true); }} className="h-12 px-4 rounded-full bg-[#e6f0ee] text-[#003531] font-semibold text-sm">Edit</button>
+                    <button type="button" onClick={() => { setEditingReminder(rem); setReminderFrequency(rem.frequency || 'DAILY'); setReminderFormError(''); setShowReminderForm(true); }} className="h-12 px-4 rounded-full bg-[#e6f0ee] text-[#003531] font-semibold text-sm">Edit</button>
                     <button type="button" onClick={() => deleteReminder(rem)} className="h-12 px-4 rounded-full bg-red-50 text-red-800 font-semibold text-sm">Delete</button>
                   </div>
                 </div>
@@ -506,8 +593,10 @@ const deleteMemory = async (memory) => {
                 if (showReminderForm) {
                   setShowReminderForm(false);
                   setEditingReminder(null);
+                  setReminderFrequency('DAILY');
                 } else {
                   setEditingReminder(null);
+                  setReminderFrequency('DAILY');
                   setShowReminderForm(true);
                 }
               }}
@@ -530,13 +619,29 @@ const deleteMemory = async (memory) => {
                 </label>
                 <label className="flex flex-col gap-1 text-sm font-semibold text-[#003531]">
                   Reminder time
-                  <input name="reminderTime" type="time" required defaultValue={editingReminder?.rawTime || ''} className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base" />
+                  <input
+                    name="reminderTime"
+                    type="time"
+                    required={reminderFrequency === 'DAILY'}
+                    disabled={reminderFrequency === 'AS_NEEDED'}
+                    defaultValue={editingReminder?.rawTime || ''}
+                    className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base disabled:bg-gray-100 disabled:text-gray-500"
+                  />
+                  <span className="text-xs font-normal text-[#59615f]">
+                    {reminderFrequency === 'DAILY'
+                      ? 'Choose the time when the daily pop-up should appear.'
+                      : 'No time is needed for an as-needed medicine.'}
+                  </span>
                 </label>
                 <label className="flex flex-col gap-1 text-sm font-semibold text-[#003531]">
                   Frequency
-                  <select name="frequency" defaultValue={editingReminder?.subtitle || 'DAILY'} className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base">
+                  <select
+                    name="frequency"
+                    value={reminderFrequency}
+                    onChange={(event) => setReminderFrequency(event.target.value)}
+                    className="h-12 rounded-xl border border-[#bfc8c6] bg-white px-3 text-base"
+                  >
                     <option value="DAILY">Daily</option>
-                    <option value="WEEKLY">Weekly</option>
                     <option value="AS_NEEDED">As needed</option>
                   </select>
                 </label>
@@ -736,11 +841,10 @@ const deleteMemory = async (memory) => {
                 <button
                   type="button"
                   onClick={toggleVoiceNote}
-                  className={`w-full h-14 rounded-full font-bold text-base flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm ${
-                    voicePlaying
-                      ? 'bg-[#994703] text-white'
-                      : 'bg-[#ffdbc9] text-[#321200] hover:bg-[#ffb68c] active:scale-95'
-                  }`}
+                  className={`w-full h-14 rounded-full font-bold text-base flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm ${voicePlaying
+                    ? 'bg-[#994703] text-white'
+                    : 'bg-[#ffdbc9] text-[#321200] hover:bg-[#ffb68c] active:scale-95'
+                    }`}
                 >
                   <span className="material-symbols-outlined text-[24px]">
                     {voicePlaying ? 'pause_circle' : 'volume_up'}
@@ -891,6 +995,65 @@ const deleteMemory = async (memory) => {
           </div>
         </div>
       </div>
+
+      {/* Daily Medicine Reminder Popup */}
+      {dueReminder && (
+        <div className="fixed inset-0 z-[60] bg-black/65 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="medicine-reminder-title"
+            className="w-full max-w-md rounded-3xl bg-white p-6 sm:p-8 shadow-2xl"
+          >
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#ffdbc9] text-[#994703]">
+              <span className="material-symbols-outlined text-[36px]">medication</span>
+            </div>
+
+            <p className="text-center text-sm font-bold uppercase tracking-wider text-[#994703]">
+              Daily medicine reminder
+            </p>
+            <h2
+              id="medicine-reminder-title"
+              className="mt-2 text-center text-2xl font-bold text-[#003531]"
+            >
+              It&apos;s time for your medicine
+            </h2>
+
+            <div className="mt-6 rounded-2xl bg-[#ecf6f4] p-5 text-center">
+              <h3 className="text-xl font-bold text-[#003531]">
+                {dueReminder.title}
+              </h3>
+              <p className="mt-1 text-base text-[#404947]">
+                {dueReminder.note}
+              </p>
+              <p className="mt-3 text-sm font-semibold text-[#59615f]">
+                Scheduled for {dueReminder.time}
+              </p>
+            </div>
+
+            <p className="mt-5 text-center text-sm text-[#59615f]">
+              Please follow the dosage instructions provided by your healthcare professional.
+            </p>
+
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={closeDueReminder}
+                className="h-12 rounded-full bg-[#003531] text-white font-bold hover:bg-[#0e4d48]"
+              >
+                Taken
+              </button>
+              <button
+                type="button"
+                onClick={closeDueReminder}
+                className="h-12 rounded-full bg-[#e6f0ee] text-[#003531] font-bold hover:bg-[#dbe5e2]"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Photo Album Modal */}
       {showPhotoModal && (

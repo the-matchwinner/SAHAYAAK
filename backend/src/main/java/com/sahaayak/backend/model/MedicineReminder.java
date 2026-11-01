@@ -15,9 +15,15 @@ public class MedicineReminder {
     public MedicineReminder() {
     }
 
-    public MedicineReminder(Long id, Long userId, String medicineName,
-            String dosage, LocalTime reminderTime,
-            String frequency, String status) {
+    public MedicineReminder(
+            Long id,
+            Long userId,
+            String medicineName,
+            String dosage,
+            LocalTime reminderTime,
+            String frequency,
+            String status) {
+
         this.id = id;
         this.userId = userId;
         this.medicineName = medicineName;
