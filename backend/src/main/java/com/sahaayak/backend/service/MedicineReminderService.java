@@ -1,7 +1,5 @@
-
 package com.sahaayak.backend.service;
 
-import java.time.DayOfWeek;
 import java.util.List;
 import java.util.Locale;
 
@@ -20,111 +18,129 @@ public class MedicineReminderService {
         this.repository = repository;
     }
 
-    private String validateAndNormalizeFrequency(
-            MedicineReminderRequest request) {
+    // Validate frequency
+    private String validateAndNormalizeFrequency(String frequency) {
 
-        if (request.getFrequency() == null
-                || request.getFrequency().isBlank()) {
+        if (frequency == null || frequency.isBlank()) {
             throw new IllegalArgumentException(
-                    "Frequency is required.");
+                    "Frequency is required."
+            );
         }
 
-        String frequency = request.getFrequency()
-                .trim()
-                .toUpperCase(Locale.ROOT);
+        String normalizedFrequency =
+                frequency.trim().toUpperCase(Locale.ROOT);
 
-        if (!frequency.equals("DAILY")
-                && !frequency.equals("WEEKLY")) {
+        if (!normalizedFrequency.equals("DAILY")
+                && !normalizedFrequency.equals("AS_NEEDED")) {
+
             throw new IllegalArgumentException(
-                    "Frequency must be DAILY or WEEKLY.");
+                    "Frequency must be DAILY or AS_NEEDED."
+            );
         }
 
-        return frequency;
+        return normalizedFrequency;
     }
 
-    private String validateAndNormalizeDayOfWeek(
-            String frequency, String dayOfWeek) {
-
-        if (frequency.equals("DAILY")) {
-            return null;
-        }
-
-        if (dayOfWeek == null || dayOfWeek.isBlank()) {
-            throw new IllegalArgumentException(
-                    "Day of week is required for WEEKLY reminders.");
-        }
-
-        try {
-            return DayOfWeek.valueOf(
-                    dayOfWeek.trim().toUpperCase(Locale.ROOT))
-                    .name();
-        } catch (IllegalArgumentException exception) {
-            throw new IllegalArgumentException(
-                    "Invalid day. Use MONDAY, TUESDAY, WEDNESDAY, "
-                    + "THURSDAY, FRIDAY, SATURDAY or SUNDAY.");
-        }
-    }
-
-    public MedicineReminder createReminder(
+    // Validate the complete reminder request
+    private MedicineReminder buildReminder(
             MedicineReminderRequest request) {
+
+        if (request == null) {
+            throw new IllegalArgumentException(
+                    "Reminder details are required."
+            );
+        }
+
+        if (request.getUserId() == null) {
+            throw new IllegalArgumentException(
+                    "User ID is required."
+            );
+        }
+
+        if (request.getMedicineName() == null
+                || request.getMedicineName().isBlank()) {
+            throw new IllegalArgumentException(
+                    "Medicine name is required."
+            );
+        }
+
+        if (request.getDosage() == null
+                || request.getDosage().isBlank()) {
+            throw new IllegalArgumentException(
+                    "Medicine dosage is required."
+            );
+        }
 
         String frequency =
-                validateAndNormalizeFrequency(request);
+                validateAndNormalizeFrequency(request.getFrequency());
 
-        String dayOfWeek =
-                validateAndNormalizeDayOfWeek(
-                        frequency, request.getDayOfWeek());
+        if (frequency.equals("DAILY")
+                && request.getReminderTime() == null) {
+
+            throw new IllegalArgumentException(
+                    "Reminder time is required for DAILY reminders."
+            );
+        }
 
         MedicineReminder reminder = new MedicineReminder();
 
         reminder.setUserId(request.getUserId());
-        reminder.setMedicineName(request.getMedicineName());
-        reminder.setDosage(request.getDosage());
-        reminder.setReminderTime(request.getReminderTime());
+        reminder.setMedicineName(request.getMedicineName().trim());
+        reminder.setDosage(request.getDosage().trim());
         reminder.setFrequency(frequency);
-        reminder.setDayOfWeek(dayOfWeek);
+
+        // DAILY reminders require a time.
+        // AS_NEEDED reminders do not have a scheduled time.
+        if (frequency.equals("DAILY")) {
+            reminder.setReminderTime(request.getReminderTime());
+        } else {
+            reminder.setReminderTime(null);
+        }
+
+        return reminder;
+    }
+
+    // CREATE reminder
+    public MedicineReminder createReminder(
+            MedicineReminderRequest request) {
+
+        MedicineReminder reminder = buildReminder(request);
+
         reminder.setStatus("ACTIVE");
 
         return repository.save(reminder);
     }
 
+    // GET reminders by user ID
     public List<MedicineReminder> getRemindersByUserId(Long userId) {
         return repository.findByUserId(userId);
     }
 
+    // GET reminder by ID
     public MedicineReminder getReminderById(Long id) {
         return repository.findById(id);
     }
 
+    // UPDATE reminder
     public MedicineReminder updateReminder(
-            Long id, MedicineReminderRequest request) {
+            Long id,
+            MedicineReminderRequest request) {
 
-        String frequency =
-                validateAndNormalizeFrequency(request);
-
-        String dayOfWeek =
-                validateAndNormalizeDayOfWeek(
-                        frequency, request.getDayOfWeek());
-
-        MedicineReminder reminder = new MedicineReminder();
+        MedicineReminder reminder = buildReminder(request);
 
         reminder.setId(id);
-        reminder.setUserId(request.getUserId());
-        reminder.setMedicineName(request.getMedicineName());
-        reminder.setDosage(request.getDosage());
-        reminder.setReminderTime(request.getReminderTime());
-        reminder.setFrequency(frequency);
-        reminder.setDayOfWeek(dayOfWeek);
 
-        return repository.update(reminder)
-                ? repository.findById(id)
-                : null;
+        boolean updated = repository.update(reminder);
+
+        return updated ? repository.findById(id) : null;
     }
 
+    // ACTIVATE OR DEACTIVATE reminder
     public boolean updateStatus(Long id, String status) {
         return repository.updateStatus(id, status);
     }
 
+    // DELETE reminder
     public boolean deleteReminder(Long id) {
         return repository.delete(id);
     }
