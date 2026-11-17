@@ -429,15 +429,6 @@ export default function DashboardScreen({ userName, onNavigate }) {
     }
   };
 
-  const speakSuggestion = (text) => {
-    const cleanText = text.replace(/[\u201C\u201D"]/g, '').trim();
-    speakText(`Sahaayak is looking for: ${cleanText}`);
-  };
-
-  const promptVoiceReminder = () => {
-    speakText(`Namaste ${displayName}, I am listening. Please speak your reminder.`);
-  };
-
   const toggleVoiceNote = () => {
     if (!voicePlaying) {
       setVoicePlaying(true);
@@ -454,80 +445,16 @@ export default function DashboardScreen({ userName, onNavigate }) {
     <div className="flex flex-col w-full pb-12">
       {/* GREETING & VOICE HERO */}
       <section className="w-full mb-12">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 mb-6">
-          <div>
-            <h1 className="font-bold text-3xl sm:text-4xl text-[#141d1c] tracking-tight mb-1">
-              Good morning, {displayName}.
-            </h1>
-            <p className="text-lg text-gray-600">How can Sahaayak assist you today?</p>
-          </div>
-          <div className="hidden sm:flex items-center gap-2 text-[#404947] font-semibold text-sm bg-[#ecf6f4] border border-[#bfc8c6]/40 px-4 py-2 rounded-full shadow-sm">
-            <span className="material-symbols-outlined text-[#994703] text-[20px]">schedule</span>
-            <span>Assistance Ready • Tap or Speak</span>
-          </div>
-        </div>
-
-        <div className="relative overflow-hidden rounded-3xl bg-[#0e4d48] text-white p-6 sm:p-8 shadow-xl">
-          <div className="absolute -right-16 -top-16 w-96 h-96 rounded-full bg-[#fc934f]/20 blur-3xl pointer-events-none"></div>
+        <div className="relative overflow-hidden rounded-3xl bg-[#0e4d48] text-white px-6 py-8 sm:px-8 sm:py-10 shadow-xl">
+          <div className="absolute -right-16 -top-16 w-96 h-96 rounded-full bg-[#fc934f]/10 blur-3xl pointer-events-none"></div>
           <div className="absolute -left-12 -bottom-12 w-80 h-80 rounded-full bg-[#003531]/40 blur-2xl pointer-events-none"></div>
-
-          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div className="max-w-2xl">
-              <div className="flex items-center gap-2 text-[#84bdb6] font-semibold text-sm sm:text-base mb-2">
-                <span className="material-symbols-outlined text-[22px] text-[#fc934f]">graphic_eq</span>
-                <span>Always Listening • Speak in Hindi or English</span>
-              </div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-white mb-2 leading-tight tracking-tight">
-                Talk to Sahaayak
-              </h2>
-              <p className="text-base sm:text-lg text-[#84bdb6] leading-relaxed">
-                Tap the large orange microphone or say <span className="font-bold text-white">“Hey Sahaayak”</span> anytime to set reminders, make calls, or play music.
-              </p>
-            </div>
-
-            <div className="flex flex-col items-center gap-2.5 shrink-0">
-              <div className="relative flex items-center justify-center">
-                <span className="absolute h-24 w-24 rounded-full bg-[#fc934f]/30 animate-ping pointer-events-none"></span>
-                <span className="absolute h-20 w-20 rounded-full bg-[#D97736]/40 animate-pulse pointer-events-none"></span>
-                <button
-                  type="button"
-                  id="voiceHeroMicBtn"
-                  aria-label="Activate Sahaayak Voice Assistant"
-                  onClick={promptVoiceReminder}
-                  className="relative h-[76px] w-[76px] rounded-full bg-[#D97736] hover:bg-[#E08746] active:scale-95 transition-all text-white shadow-xl flex items-center justify-center cursor-pointer focus:outline-none focus:ring-4 focus:ring-[#D97736]/50"
-                >
-                  <span className="material-symbols-outlined text-[40px]">mic</span>
-                </button>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[#fc934f] text-[18px]">sound_detection_loud_sound</span>
-                <span className="text-sm font-bold tracking-wide text-white text-center">Tap &amp; Speak</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="relative z-10 mt-6 pt-5 border-t border-white/15">
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <span className="block text-xs uppercase tracking-wider text-[#84bdb6] font-bold">Quick voice suggestions:</span>
-              <span className="text-xs text-[#84bdb6] hidden sm:inline">Click any pill to try</span>
-            </div>
-            <div className="flex flex-wrap gap-2.5 sm:gap-3">
-              {[
-                { icon: 'call', label: '“Call my daughter”' },
-                { icon: 'event_upcoming', label: '“Read today’s reminders”' },
-                { icon: 'photo_library', label: '“Show my family photos”' },
-              ].map((s, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => speakSuggestion(s.label)}
-                  className="bg-white/15 hover:bg-white/25 active:bg-white/35 hover:scale-105 border border-white/25 rounded-full px-5 py-2.5 text-sm sm:text-base font-semibold transition-all cursor-pointer flex items-center gap-2.5 text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-white/40"
-                >
-                  <span className="material-symbols-outlined text-[#fc934f] text-[22px]">{s.icon}</span>
-                  <span>{s.label}</span>
-                </button>
-              ))}
-            </div>
+          <div className="relative z-10 max-w-3xl">
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-3 leading-tight tracking-tight">
+              Talk to Sahaayak
+            </h2>
+            <p className="text-base sm:text-lg text-[#b5d8d2] leading-relaxed">
+              How are you today? What would you like to do? Sahaayak is here to help with your reminders, family contacts, and everyday needs.
+            </p>
           </div>
         </div>
       </section>
