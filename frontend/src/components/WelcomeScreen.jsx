@@ -56,27 +56,6 @@ export default function WelcomeScreen({ userName, setUserName, onContinue }) {
               </div>
             </div>
 
-            {/* Voice Feedback indicator */}
-            {isListening && (
-              <div
-                id="listeningFeedback"
-                className="flex items-center justify-between p-4 bg-[#ffdbc9]/60 border border-[#fc934f]/30 rounded-2xl animate-fade-in"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="relative flex h-3.5 w-3.5 items-center justify-center">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#994703] opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#994703]"></span>
-                  </div>
-                  <span className="text-sm font-semibold text-[#753400]">Listening... say your name clearly</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-1 h-5 bg-[#994703] rounded-full animate-bounce"></div>
-                  <div className="w-1 h-8 bg-[#994703] rounded-full animate-bounce [animation-delay:0.15s]"></div>
-                  <div className="w-1 h-6 bg-[#994703] rounded-full animate-bounce [animation-delay:0.3s]"></div>
-                </div>
-              </div>
-            )}
-
             {/* Continue Primary Button */}
             <button
               type="button"
