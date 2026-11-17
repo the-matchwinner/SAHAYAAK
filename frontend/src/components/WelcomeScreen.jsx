@@ -2,43 +2,7 @@ import React, { useState } from 'react';
 
 export default function WelcomeScreen({ userName, setUserName, onContinue }) {
   const [inputVal, setInputVal] = useState(userName || '');
-  const [isListening, setIsListening] = useState(false);
   const [showError, setShowError] = useState(false);
-
-  const toggleVoice = () => {
-    if (!isListening) {
-      setIsListening(true);
-
-      // Web Speech API fallback simulation
-      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'en-IN';
-        recognition.onresult = (event) => {
-          const transcript = event.results[0][0].transcript;
-          if (transcript) {
-            setInputVal(transcript);
-            setUserName(transcript);
-          }
-          setIsListening(false);
-        };
-        recognition.onerror = () => {
-          setInputVal('Dadaji');
-          setUserName('Dadaji');
-          setIsListening(false);
-        };
-        recognition.start();
-      } else {
-        setTimeout(() => {
-          setInputVal('Dadaji');
-          setUserName('Dadaji');
-          setIsListening(false);
-        }, 2000);
-      }
-    } else {
-      setIsListening(false);
-    }
-  };
 
   const handleContinue = () => {
     const trimmed = inputVal.trim();
@@ -58,23 +22,12 @@ export default function WelcomeScreen({ userName, setUserName, onContinue }) {
         <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full bg-[#b4eee6]/30 blur-3xl -z-10 pointer-events-none"></div>
         <div className="absolute top-48 right-10 w-72 h-72 rounded-full bg-[#ffdbc9]/30 blur-3xl -z-10 pointer-events-none"></div>
 
-        {/* Top Pill */}
-        <div className="inline-flex items-center gap-2 bg-[#e0eae8] border border-[#bfc8c6]/40 px-4 py-1.5 rounded-full mb-6 shadow-sm">
-          <span className="material-symbols-outlined text-[18px] text-[#994703]">auto_awesome</span>
-          <span className="text-xs font-semibold uppercase tracking-wider text-[#003531]">
-            Voice-first Assistance · No Passwords Required
-          </span>
-        </div>
-
         {/* Editorial Titles */}
         <div className="text-center max-w-2xl mb-8 px-4">
           <span className="block text-xs uppercase tracking-widest font-bold text-[#0e4d48] mb-2">SAHAAYAK</span>
           <h1 className="text-3xl sm:text-4xl font-bold text-[#141d1c] tracking-tight mb-3">
             A little help, whenever you need it.
           </h1>
-          <p className="text-lg text-[#404947] leading-relaxed">
-            No complicated menus or passwords. Just tell us your name to begin, or press the microphone to talk.
-          </p>
         </div>
 
         {/* Name Input Card */}
@@ -100,16 +53,6 @@ export default function WelcomeScreen({ userName, setUserName, onContinue }) {
                     showError ? 'border-[#fc934f] ring-4 ring-[#fc934f]/30' : 'border-[#0e4d48]'
                   } focus:border-[#003531] focus:bg-white focus:outline-none focus:ring-4 focus:ring-teal-200 transition-all placeholder:text-[#707977] font-medium`}
                 />
-                <button
-                  type="button"
-                  id="voiceToggleInline"
-                  aria-label="Speak your name"
-                  onClick={toggleVoice}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-12 px-4 rounded-xl bg-[#e6f0ee] hover:bg-[#ffdbc9] text-[#994703] font-semibold text-sm flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[22px]">mic</span>
-                  <span>Speak</span>
-                </button>
               </div>
             </div>
 
@@ -146,29 +89,6 @@ export default function WelcomeScreen({ userName, setUserName, onContinue }) {
             </button>
           </div>
 
-          {/* Secondary Voice Option Strip */}
-          <div className="mt-6 pt-5 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5 text-center sm:text-left">
-              <button
-                type="button"
-                id="micPulseBtn"
-                aria-label="Tap to speak"
-                onClick={toggleVoice}
-                className="relative shrink-0 h-14 w-14 rounded-full bg-[#994703] text-white flex items-center justify-center shadow-md transition-all hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-amber-200 cursor-pointer group"
-              >
-                <span className="material-symbols-outlined text-[28px]">mic</span>
-                <span className="absolute inset-0 rounded-full bg-[#fc934f] opacity-30 animate-ping pointer-events-none"></span>
-              </button>
-              <div className="flex flex-col">
-                <span className="font-bold text-base text-[#003531]">Prefer speaking?</span>
-                <span className="text-sm text-[#404947]">Tap the microphone and simply say your name</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5 bg-[#e6f0ee] px-3.5 py-1.5 rounded-full text-xs font-semibold text-[#003531]">
-              <span className="material-symbols-outlined text-[#994703] text-[18px]">volume_up</span>
-              <span>Hindi &amp; English</span>
-            </div>
-          </div>
         </div>
 
         {/* Feature Cards Grid */}
