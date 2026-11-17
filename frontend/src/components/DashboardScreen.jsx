@@ -170,7 +170,6 @@ export default function DashboardScreen({ userName, onNavigate }) {
   // State for voice note audio simulation
   const [voicePlaying, setVoicePlaying] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
-  const [activeMusic, setActiveMusic] = useState(null);
 
   const memoryPhotoUrl = "https://lh3.googleusercontent.com/aida/AEtjO1Xml2rYMlSnOrELQis8hvmelm7otQsUOPimJ8szKoCGGu4P12tbrYMQwQN8qI1-pXTcHBw-JRJQPNHsN86Y1ALbpx5jUfd-Asy7VBMy83-Ic5bAY_G7Xf24P4AhKyvbnBFxf-8xeklgfYZhDeoizwINjf1qquprIpQ8vTU4zWiUF-1HSdTEK6dRG566VvKheRvYZInD3avPYPcIXbSNYSYItFpBj6a8a9YFZ3w1Jj11D_n-g8tYsnnXmxc";
   const featuredMemory = memories[0];
@@ -451,16 +450,6 @@ export default function DashboardScreen({ userName, onNavigate }) {
     }
   };
 
-  const toggleMusic = (trackName) => {
-    if (activeMusic === trackName) {
-      setActiveMusic(null);
-      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-    } else {
-      setActiveMusic(trackName);
-      speakText(`Now playing ${trackName} for ${displayName}`);
-    }
-  };
-
   return (
     <div className="flex flex-col w-full pb-12">
       {/* GREETING & VOICE HERO */}
@@ -526,7 +515,6 @@ export default function DashboardScreen({ userName, onNavigate }) {
               {[
                 { icon: 'call', label: '“Call my daughter”' },
                 { icon: 'event_upcoming', label: '“Read today’s reminders”' },
-                { icon: 'music_note', label: '“Play morning music”' },
                 { icon: 'photo_library', label: '“Show my family photos”' },
               ].map((s, idx) => (
                 <button
@@ -961,86 +949,6 @@ export default function DashboardScreen({ userName, onNavigate }) {
             </div>
           </section>
 
-          {/* Entertainment & Serenity Section */}
-          <section className="bg-white rounded-2xl p-6 sm:p-8 shadow-md flex flex-col gap-4 border border-[#dbe5e2]">
-            <div className="flex items-center gap-3 mb-1">
-              <div className="h-12 w-12 rounded-full bg-[#e6f0ee] flex items-center justify-center text-[#003531] shadow-sm">
-                <span className="material-symbols-outlined text-[28px]">self_improvement</span>
-              </div>
-              <div>
-                <h2 className="font-bold text-2xl text-[#003531]">Entertainment &amp; Serenity</h2>
-                <span className="text-base text-[#404947]">Peaceful listening &amp; mind games</span>
-              </div>
-            </div>
-
-            {/* Track 1 */}
-            <div className="p-4 rounded-2xl bg-[#ecf6f4] hover:bg-[#e6f0ee] flex items-center justify-between gap-4 transition-all shadow-sm border border-[#dbe5e2]">
-              <div className="flex items-center gap-4 min-w-0">
-                <div className="h-14 w-14 rounded-full bg-[#994703] text-white flex items-center justify-center shrink-0 shadow-sm">
-                  <span className="material-symbols-outlined text-[30px]">spa</span>
-                </div>
-                <div className="min-w-0">
-                  <h3 className="font-bold text-lg text-[#003531] truncate">Morning Music &amp; Bhajans</h3>
-                  <p className="text-sm text-[#404947] truncate">Peaceful devotional melodies</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                aria-label="Play morning music"
-                onClick={() => toggleMusic('Morning Music')}
-                className="h-14 w-14 rounded-full bg-[#003531] text-white flex items-center justify-center hover:scale-105 active:scale-95 transition-all shrink-0 cursor-pointer shadow-sm"
-              >
-                <span className="material-symbols-outlined text-[32px]">
-                  {activeMusic === 'Morning Music' ? 'pause' : 'play_arrow'}
-                </span>
-              </button>
-            </div>
-
-            {/* Track 2 */}
-            <div className="p-4 rounded-2xl bg-[#ecf6f4] hover:bg-[#e6f0ee] flex items-center justify-between gap-4 transition-all shadow-sm border border-[#dbe5e2]">
-              <div className="flex items-center gap-4 min-w-0">
-                <div className="h-14 w-14 rounded-full bg-[#0e4d48] text-white flex items-center justify-center shrink-0 shadow-sm">
-                  <span className="material-symbols-outlined text-[30px]">radio</span>
-                </div>
-                <div className="min-w-0">
-                  <h3 className="font-bold text-lg text-[#003531] truncate">Radio Broadcasts</h3>
-                  <p className="text-sm text-[#404947] truncate">National Radio • Live Stream</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                aria-label="Play live radio"
-                onClick={() => toggleMusic('Radio Broadcasts')}
-                className="h-14 w-14 rounded-full bg-[#e6f0ee] text-[#003531] hover:bg-[#dbe5e2] active:scale-95 transition-all flex items-center justify-center shrink-0 cursor-pointer shadow-sm"
-              >
-                <span className="material-symbols-outlined text-[30px] text-[#994703]">
-                  {activeMusic === 'Radio Broadcasts' ? 'pause' : 'play_arrow'}
-                </span>
-              </button>
-            </div>
-
-            {/* Track 3 */}
-            <div className="p-4 rounded-2xl bg-[#ecf6f4] hover:bg-[#e6f0ee] flex items-center justify-between gap-4 transition-all shadow-sm border border-[#dbe5e2]">
-              <div className="flex items-center gap-4 min-w-0">
-                <div className="h-14 w-14 rounded-full bg-[#e6f0ee] text-[#003531] flex items-center justify-center shrink-0 shadow-sm">
-                  <span className="material-symbols-outlined text-[30px]">extension</span>
-                </div>
-                <div className="min-w-0">
-                  <h3 className="font-bold text-lg text-[#003531] truncate">Daily Mind Games</h3>
-                  <p className="text-sm text-[#404947] truncate">Sudoku &amp; Simple Word Match</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                aria-label="Play daily puzzle"
-                onClick={() => speakText("Opening Sudoku and Mind Puzzle")}
-                className="h-14 px-5 rounded-full bg-[#e6f0ee] text-[#003531] hover:bg-[#dbe5e2] active:scale-95 font-semibold text-base flex items-center gap-1 transition-all shrink-0 cursor-pointer"
-              >
-                <span>Play</span>
-                <span className="material-symbols-outlined text-[20px]">chevron_right</span>
-              </button>
-            </div>
-          </section>
         </div>
       </div>
 
